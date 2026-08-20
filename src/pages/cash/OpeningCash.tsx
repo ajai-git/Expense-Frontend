@@ -22,13 +22,13 @@ function formatCurrency(n: number) {
   }).format(n);
 }
 
-type Location = {
+interface Location {
   locationId: string;
   branchName: string;
   aliasName?: string;
-  status?: string;
-  type?: string;
-};
+  status: string;
+  [key: string]: unknown;
+}
 
 type CashSession = {
   id: string;
@@ -123,22 +123,50 @@ export function OpeningCash() {
 
       const data = await getLocations();
 
-      const activeLocations = Array.isArray(data)
-        ? data.filter(
-          location =>
+      console.log('OPENING CASH LOCATIONS:', data);
+
+      const normalizedLocations: Location[] = Array.isArray(data)
+        ? data.map((location: any) => ({
+          locationId:
+            location.locationId ??
+            location.location_id ??
+            location.id ??
+            '',
+          branchName:
+            location.branchName ??
+            location.branch_name ??
+            location.name ??
+            '',
+          aliasName:
+            location.aliasName ??
+            location.alias_name ??
+            '',
+          status: location.status,
+          type: location.type,
+        }))
+        : [];
+
+      const activeLocations = normalizedLocations.filter(
+        location =>
+          location.locationId &&
+          (
             !location.status ||
             location.status.toLowerCase() === 'active'
-        )
-        : [];
+          )
+      );
 
       setLocations(activeLocations);
     } catch (error) {
+      console.error('OPENING CASH LOCATION ERROR:', error);
+
       notify(
         error instanceof Error
           ? error.message
           : 'Failed to load locations',
         'error'
       );
+
+      setLocations([]);
     } finally {
       setLocationsLoading(false);
     }
@@ -260,7 +288,6 @@ export function OpeningCash() {
           location_id: form.location_id,
           opening_balance: amount,
           date: selectedDate,
-          shift: form.shift,
           notes: form.notes || null,
         }
       );
@@ -672,12 +699,8 @@ export function OpeningCash() {
                   value={location.locationId}
                 >
                   {location.branchName}
-                  {location.aliasName
-                    ? ` (${location.aliasName})`
-                    : ''}
                 </option>
               ))}
-
             </select>
           </div>
 

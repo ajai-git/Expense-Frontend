@@ -13,7 +13,7 @@ import { ApprovalRules } from './pages/masters/Approvalrules';
 // import { CostCenters } from './pages/masters/Costcenters';
 import { OpeningCash } from './pages/cash/OpeningCash';
 import { DayClosing } from './pages/cash/DayClosing';
-import { AddExpense } from './pages/expenses/AddExpense';
+import { PettyCashExpense } from './pages/expenses/PettyCashExpense';
 import { MyExpenses } from './pages/expenses/MyExpenses';
 import { TemplateExpense } from './pages/expenses/TemplateExpense';
 import { DriverExpense } from './pages/expenses/Driverexpense';
@@ -21,6 +21,7 @@ import { ApprovalQueue } from './pages/approvals/ApprovalQueue';
 import { Reports } from './pages/reports/Reports';
 import { Settings } from './pages/settings/Settings';
 import { Login } from './components/auth/Login';
+import { BankExpense } from './pages/expenses/BankExpense';
 
 const SESSION_STORAGE_KEY = 'yenerp_user';
 
@@ -33,7 +34,8 @@ const ROUTES: Record<string, React.ComponentType> = {
  // 'masters/cost-centers': CostCenters,
   'cash/opening': OpeningCash,
   'cash/day-closing': DayClosing,
-  'expenses/add': AddExpense,
+  'expenses/add':PettyCashExpense,
+  'expenses/bank': BankExpense,
   'expenses/my': MyExpenses,
   'expenses/template': TemplateExpense,
   'expenses/driver': DriverExpense,

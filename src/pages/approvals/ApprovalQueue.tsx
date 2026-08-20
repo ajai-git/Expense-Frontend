@@ -6,7 +6,7 @@ import {
 import { StatusBadge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { useApp } from '../../store/AppContext';
-import { mongoDb } from '../../lib/mongoApi';
+import { api } from '../../lib/api';
 import { ExpenseEntry } from '../../types';
 
 function formatCurrency(n: number) {
@@ -47,89 +47,102 @@ export function ApprovalQueue() {
 
   // mychanges ----------------------------------*********--------------------------my changes"""
   async function loadQueue() {
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    const response = await fetch(
-      'http://127.0.0.1:8000/api/v1/expenses/approvals/pending'
-    );
+    try {
+      const data = await api.get<ExpenseEntry[]>(
+        '/api/v1/expenses/approvals/pending'
+      );
 
-    if (!response.ok) {
-      throw new Error('Failed to load approval queue');
-    }
-
-    const result = await response.json();
-
-    if (result.success) {
-      setExpenses(result.data ?? []);
-    } else {
+      setExpenses(data ?? []);
+    } catch (error) {
+      console.error('Approval queue error:', error);
+      notify(
+        error instanceof Error
+          ? error.message
+          : 'Failed to load approval queue',
+        'error'
+      );
       setExpenses([]);
-      notify(result.message || 'Failed to load approval queue', 'error');
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Approval queue error:', error);
-    notify('Failed to load approval queue', 'error');
-    setExpenses([]);
-  } finally {
-    setLoading(false);
   }
-}
 
-  async function processDecision(expenseId: string, action: 'approve' | 'reject' | 'clarify' | 'hold') {
+  async function processDecision(
+    expenseId: string,
+    action: 'approve' | 'reject' | 'clarify' | 'hold'
+  ) {
     setSubmitting(true);
-    const STATUS_MAP = {
-      approve: 'posted',
-      reject: 'rejected',
-      clarify: 'clarification_required',
-      hold: 'submitted',
-    } as const;
-    const APPROVAL_MAP = {
-      approve: 'approved',
-      reject: 'rejected',
-      clarify: 'clarification_required',
-      hold: 'pending',
-    } as const;
-    const expense = expenses.find(e => e.id === expenseId);
-    const newStatus = STATUS_MAP[action];
 
-    const { error } = await mongoDb.from('expense_entries').update({
-      status: newStatus,
-      approval_status: APPROVAL_MAP[action],
-      approved_by: action === 'approve' ? state.user.name : undefined,
-      approved_at: action === 'approve' ? new Date().toISOString() : undefined,
-      rejected_by: action === 'reject' ? state.user.name : undefined,
-      rejected_at: action === 'reject' ? new Date().toISOString() : undefined,
-      approval_remarks: decisionRemarks,
-      updated_at: new Date().toISOString(),
-    }).eq('id', expenseId);
+    try {
+      let message = '';
 
-    if (!error) {
-      // Update cash session if approving
-      if (action === 'approve' && expense?.cash_session_id) {
-        const { data: sess } = await mongoDb.from<{ posted_expense_amount: number; system_balance: number }>('cash_sessions')
-          .select('*')
-          .eq('id', expense.cash_session_id)
-          .single();
-        if (sess) {
-          await mongoDb.from('cash_sessions').update({
-            posted_expense_amount: (sess.posted_expense_amount || 0) + (expense?.amount || 0),
-            system_balance: sess.system_balance - (expense?.amount || 0),
-            updated_at: new Date().toISOString(),
-          }).eq('id', expense.cash_session_id);
-        }
+      if (action === 'approve') {
+        await api.post(
+          `/api/v1/expenses/${expenseId}/approve`,
+          {
+            action: 'approve',
+          }
+        );
+
+        message = 'Expense approved successfully';
       }
-      const MESSAGES = {
-        approve: 'Expense approved and posted',
-        reject: 'Expense rejected',
-        clarify: 'Clarification requested',
-        hold: 'Expense put on hold',
-      };
-      notify(MESSAGES[action]);
+
+      if (action === 'reject') {
+        await api.post(
+          `/api/v1/expenses/${expenseId}/reject`,
+          {
+            action: 'reject',
+            reason: decisionRemarks,
+          }
+        );
+
+        message = 'Expense rejected';
+      }
+
+      if (action === 'hold') {
+        await api.post(
+          `/api/v1/expenses/${expenseId}/hold`,
+          {
+            action: 'hold',
+            reason: decisionRemarks,
+          }
+        );
+
+        message = 'Expense put on hold';
+      }
+
+      if (action === 'clarify') {
+        await api.post(
+          `/api/v1/expenses/${expenseId}/clarify`,
+          {
+            action: 'clarify',
+            clarification_note: decisionRemarks,
+          }
+        );
+
+        message = 'Clarification requested';
+      }
+
+      notify(message);
+
       setActionModal(null);
       setDecisionRemarks('');
-      loadQueue();
-    } else notify(error.message, 'error');
-    setSubmitting(false);
+      await loadQueue();
+
+    } catch (error) {
+      console.error('Approval action error:', error);
+
+      notify(
+        error instanceof Error
+          ? error.message
+          : 'Failed to process expense',
+        'error'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function bulkAction(action: 'approve' | 'reject') {
@@ -250,9 +263,8 @@ export function ApprovalQueue() {
                 </td>
                 <td className="table-cell text-sm text-slate-600">{e.entered_by}</td>
                 <td className="table-cell">
-                  <span className={`text-xs font-medium ${
-                    getAge(e.created_at).includes('d') ? 'text-red-600' : 'text-amber-600'
-                  }`}>
+                  <span className={`text-xs font-medium ${getAge(e.created_at).includes('d') ? 'text-red-600' : 'text-amber-600'
+                    }`}>
                     {getAge(e.created_at)}
                   </span>
                 </td>
@@ -363,8 +375,8 @@ export function ApprovalQueue() {
           onClose={() => setActionModal(null)}
           title={
             actionModal.type === 'approve' ? 'Approve Expense' :
-            actionModal.type === 'reject' ? 'Reject Expense' :
-            actionModal.type === 'clarify' ? 'Request Clarification' : 'Put On Hold'
+              actionModal.type === 'reject' ? 'Reject Expense' :
+                actionModal.type === 'clarify' ? 'Request Clarification' : 'Put On Hold'
           }
           size="sm"
           footer={

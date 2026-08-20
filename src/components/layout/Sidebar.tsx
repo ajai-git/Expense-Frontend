@@ -52,9 +52,10 @@ const NAV_ITEMS: NavItem[] = [
     icon: <PlusCircle size={18} />,
     roles: ['admin', 'accounts', 'outlet_incharge', 'driver_supervisor', 'manager'],
     children: [
-      { id: 'expenses/add', label: 'Add Expense', icon: <PlusCircle size={16} />, roles: ['admin', 'accounts', 'outlet_incharge', 'driver_supervisor'] },
+      { id: 'expenses/add', label: 'Petty Cash Expense', icon: <PlusCircle size={16} />, roles: ['admin', 'accounts', 'outlet_incharge', 'driver_supervisor'] },
+       { id: 'expenses/bank', label: 'Bank Expense', icon: <Building2 size={16} />, roles: ['admin', 'accounts', 'outlet_incharge'] },
       { id: 'expenses/template', label: 'Template Entry', icon: <Receipt size={16} />, roles: ['admin', 'accounts', 'outlet_incharge'] },
-      { id: 'expenses/driver', label: 'Driver Expense', icon: <Truck size={16} />, roles: ['admin', 'accounts', 'driver_supervisor'] },
+    // { id: 'expenses/driver', label: 'Driver Expense', icon: <Truck size={16} />, roles: ['admin', 'accounts', 'driver_supervisor'] },
       { id: 'expenses/my', label: 'My Expenses', icon: <FileText size={16} />, roles: ['admin', 'accounts', 'outlet_incharge', 'driver_supervisor'] },
     ],
   },

@@ -33,7 +33,22 @@ export async function getLocations() {
     );
   }
 
-  return Array.isArray(json)
-    ? json
-    : json?.data ?? [];
+  // Handle different response structures
+  if (Array.isArray(json)) {
+    return json;
+  }
+
+  if (Array.isArray(json?.data)) {
+    return json.data;
+  }
+
+  if (Array.isArray(json?.locations)) {
+    return json.locations;
+  }
+
+  if (Array.isArray(json?.data?.locations)) {
+    return json.data.locations;
+  }
+
+  return [];
 }
