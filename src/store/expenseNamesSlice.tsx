@@ -101,7 +101,7 @@ function reducer(state: ExpenseNamesState, action: ExpenseNamesAction): ExpenseN
       const exists = state.items.some(i => i.id === action.payload.id);
       const items = exists
         ? state.items.map(i => (i.id === action.payload.id ? action.payload : i))
-        : [...state.items, action.payload];
+        : [action.payload, ...state.items];
       return { ...state, items };
     }
     default:
@@ -120,7 +120,7 @@ interface ExpenseNamesContextValue {
   setEditing: (patch: Partial<ExpenseName>) => void;
   refresh: () => Promise<void>;
   save: () => Promise<boolean>;
-toggleActive: (item: ExpenseName) => Promise<boolean>;
+  toggleActive: (item: ExpenseName) => Promise<boolean>;
 
 }
 
@@ -154,10 +154,10 @@ export function ExpenseNamesProvider({ children }: { children: ReactNode }) {
   const setFilterCat = (v: string) => dispatch({ type: 'SET_FILTER_CAT', payload: v });
 
   const setStatusFilter = (value: 'active' | 'inactive') =>
-  dispatch({
-    type: 'SET_STATUS_FILTER',
-    payload: value,
-  });
+    dispatch({
+      type: 'SET_STATUS_FILTER',
+      payload: value,
+    });
 
   const openEdit = (item?: ExpenseName) =>
     dispatch({ type: 'OPEN_MODAL', payload: item ?? EMPTY_EXPENSE_NAME });
@@ -169,16 +169,16 @@ export function ExpenseNamesProvider({ children }: { children: ReactNode }) {
 
   const save = useCallback(async (): Promise<boolean> => {
     const { editing } = state;
- if (!editing.name?.trim() || !editing.category_id) {
-  notify('Name and Category are required', 'error');
-  return false;
-}
+    if (!editing.name?.trim() || !editing.category_id) {
+      notify('Name and Category are required', 'error');
+      return false;
+    }
 
     dispatch({ type: 'SAVE_START' });
     try {
       const payload: CreateExpenseNamePayload | UpdateExpenseNamePayload = {
         category_id: editing.category_id,
-      //  code: editing.code!.toUpperCase().trim(),
+        //  code: editing.code!.toUpperCase().trim(),
         name: editing.name!.trim(),
         default_amount: editing.default_amount ?? 0,
         default_remarks: editing.default_remarks,
@@ -217,38 +217,37 @@ export function ExpenseNamesProvider({ children }: { children: ReactNode }) {
     return matchSearch && matchCat;
   });
 
-const toggleActive = useCallback(
-  async (item: ExpenseName): Promise<boolean> => {
-    try {
-      const updated = await expenseNamesApi.updateStatus(
-        item.id,
-        !item.active
-      );
+  const toggleActive = useCallback(
+    async (item: ExpenseName): Promise<boolean> => {
+      try {
+        const updated = await expenseNamesApi.updateStatus(
+          item.id,
+          !item.active
+        );
 
-      dispatch({
-        type: 'UPSERT_ITEM',
-        payload: updated,
-      });
+        dispatch({
+          type: 'UPSERT_ITEM',
+          payload: updated,
+        });
 
-      notify(
-        `Expense name ${
-          updated.active ? 'activated' : 'deactivated'
-        }`
-      );
+        notify(
+          `Expense name ${updated.active ? 'activated' : 'deactivated'
+          }`
+        );
 
-      return true;
-    } catch (e: unknown) {
-      const message =
-        e instanceof Error
-          ? e.message
-          : 'Could not update status.';
+        return true;
+      } catch (e: unknown) {
+        const message =
+          e instanceof Error
+            ? e.message
+            : 'Could not update status.';
 
-      notify(message, 'error');
-      return false;
-    }
-  },
-  [notify]
-);
+        notify(message, 'error');
+        return false;
+      }
+    },
+    [notify]
+  );
 
   const value: ExpenseNamesContextValue = {
     state,

@@ -70,6 +70,10 @@ function reducer(state: CategoriesState, action: CategoriesAction): CategoriesSt
       return { ...state, loading: false, items: action.payload };
     case 'FETCH_ERROR':
       return { ...state, loading: false, error: action.payload };
+
+    case 'SET_SEARCH':
+      return { ...state, search: action.payload };
+
     case 'SET_STATUS_FILTER':
       return { ...state, statusFilter: action.payload };
     case 'OPEN_MODAL':
@@ -82,15 +86,15 @@ function reducer(state: CategoriesState, action: CategoriesAction): CategoriesSt
       return { ...state, saving: true };
     case 'SAVE_END':
       return { ...state, saving: false };
-   case 'UPSERT_ITEM': {
+    case 'UPSERT_ITEM': {
       const exists = state.items.some(i => i.id === action.payload.id);
 
       const items = exists
         ? state.items.map(i =>
-            i.id === action.payload.id
-              ? action.payload
-              : i
-          )
+          i.id === action.payload.id
+            ? action.payload
+            : i
+        )
         : [action.payload, ...state.items];
 
       return { ...state, items };
@@ -142,7 +146,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   const setSearch = (v: string) => dispatch({ type: 'SET_SEARCH', payload: v });
 
   const setStatusFilter = (v: 'active' | 'inactive') =>
-  dispatch({ type: 'SET_STATUS_FILTER', payload: v });
+    dispatch({ type: 'SET_STATUS_FILTER', payload: v });
 
   const openEdit = (item?: ExpenseCategory) =>
     dispatch({ type: 'OPEN_MODAL', payload: item ?? EMPTY_CATEGORY });
@@ -164,7 +168,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SAVE_START' });
     try {
       const payload: CreateCategoryPayload | UpdateCategoryPayload = {
-  //      code: editing.code!.toUpperCase().trim(),
+        //      code: editing.code!.toUpperCase().trim(),
         name: editing.name!.trim(),
         description: editing.description,
         approval_required: editing.approval_required ?? false,
@@ -221,18 +225,18 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     [notify]
   );
 
-const filtered = state.items.filter(i => {
-  const matchesSearch =
-    i.name.toLowerCase().includes(state.search.toLowerCase()) ||
-    i.code.toLowerCase().includes(state.search.toLowerCase());
+  const filtered = state.items.filter(i => {
+    const matchesSearch =
+      i.name.toLowerCase().includes(state.search.toLowerCase()) ||
+      i.code.toLowerCase().includes(state.search.toLowerCase());
 
-  const matchesStatus =
-    state.statusFilter === 'active'
-      ? i.active
-      : !i.active;
+    const matchesStatus =
+      state.statusFilter === 'active'
+        ? i.active
+        : !i.active;
 
-  return matchesSearch && matchesStatus;
-});
+    return matchesSearch && matchesStatus;
+  });
 
   const value: CategoriesContextValue = {
     state,

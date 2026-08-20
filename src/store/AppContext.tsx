@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer,useCallback, useEffect, ReactNode } from 'react';
 import { AppUser, AppTheme, UserRole } from '../types';
 import { generateBrandShades, isValidHex } from '../lib/colorUtils';
 
@@ -120,12 +120,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state.theme]);
 
-  const navigate = (page: string) => dispatch({ type: 'SET_PAGE', payload: page });
+  const navigate = useCallback((page: string) => {
+  dispatch({ type: 'SET_PAGE', payload: page });
+}, []);
 
-  const notify = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    dispatch({ type: 'SHOW_NOTIFICATION', payload: { message, type } });
-    setTimeout(() => dispatch({ type: 'CLEAR_NOTIFICATION' }), 3500);
-  };
+const notify = useCallback(
+  (
+    message: string,
+    type: 'success' | 'error' | 'info' = 'success'
+  ) => {
+    dispatch({
+      type: 'SHOW_NOTIFICATION',
+      payload: { message, type },
+    });
+
+    setTimeout(() => {
+      dispatch({ type: 'CLEAR_NOTIFICATION' });
+    }, 3500);
+  },
+  []
+);
 
   return (
     <AppContext.Provider value={{ state, dispatch, navigate, notify }}>

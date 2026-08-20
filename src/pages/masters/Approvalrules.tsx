@@ -366,6 +366,7 @@ export function ApprovalRules() {
           rule={editingRule}
           onClose={closeDialog}
           onSaved={handleSaved}
+          existingRules={state.status === 'success' ? state.data : []}
         />
       )}
       <ConfirmDialog
@@ -432,10 +433,12 @@ function ApprovalRuleDialog({
   rule,
   onClose,
   onSaved,
+  existingRules,
 }: {
   rule: ApprovalRule | null;
   onClose: () => void;
   onSaved: () => void;
+  existingRules: ApprovalRule[];
 }) {
   const isEditing = rule !== null;
 
@@ -455,6 +458,7 @@ function ApprovalRuleDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmUpdate, setConfirmUpdate] = useState(false);
+  const [showRuleSuggestions, setShowRuleSuggestions] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -485,6 +489,14 @@ function ApprovalRuleDialog({
       setIsSubmitting(false);
     }
   };
+
+  const ruleSuggestions = !isEditing
+    ? existingRules.filter((rule) =>
+      rule.rule_name
+        .toLowerCase()
+        .includes(values.rule_name.trim().toLowerCase())
+    )
+    : [];
 
   const focusNext = (id: string) => {
     document.getElementById(id)?.focus();
@@ -616,21 +628,83 @@ function ApprovalRuleDialog({
         <form onSubmit={(e) => { e.preventDefault(); }}
           className="space-y-4 px-6 py-5"
         >
-          <div>
-            <label className="label" htmlFor="rule_name">Rule name *</label>
-            <input
-              id="rule_name"
-              className="input"
-              value={values.rule_name}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, rule_name: e.target.value }))
-              }
-              onKeyDown={(e) => handleEnter(e, 'min_amount')}
-              placeholder="e.g. Manager Approval"
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+          <div className="relative">
+  <label className="label" htmlFor="rule_name">
+    Rule name *
+  </label>
+
+  <input
+    id="rule_name"
+    className="input"
+    value={values.rule_name}
+    onChange={(e) => {
+      setValues((v) => ({
+        ...v,
+        rule_name: e.target.value,
+      }));
+
+      setShowRuleSuggestions(
+        !isEditing && e.target.value.trim().length > 0
+      );
+    }}
+    onFocus={() => {
+      if (!isEditing && values.rule_name.trim()) {
+        setShowRuleSuggestions(true);
+      }
+    }}
+    onBlur={() => {
+      setTimeout(() => {
+        setShowRuleSuggestions(false);
+      }, 150);
+    }}
+    onKeyDown={(e) => {
+      if (e.key === 'Enter' && showRuleSuggestions && ruleSuggestions.length > 0) {
+        e.preventDefault();
+
+        setValues((v) => ({
+          ...v,
+          rule_name: ruleSuggestions[0].rule_name,
+        }));
+
+        setShowRuleSuggestions(false);
+        return;
+      }
+
+      handleEnter(e, 'min_amount');
+    }}
+    placeholder="e.g. Manager Approval"
+    required
+    disabled={isSubmitting}
+    autoComplete="off"
+  />
+
+  {!isEditing &&
+    showRuleSuggestions &&
+    values.rule_name.trim() &&
+    ruleSuggestions.length > 0 && (
+      <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+        {ruleSuggestions.map((suggestion) => (
+          <button
+            key={suggestion.id}
+            type="button"
+            className="flex w-full items-center px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+            onMouseDown={(e) => {
+              e.preventDefault();
+
+              setValues((v) => ({
+                ...v,
+                rule_name: suggestion.rule_name,
+              }));
+
+              setShowRuleSuggestions(false);
+            }}
+          >
+            {suggestion.rule_name}
+          </button>
+        ))}
+      </div>
+    )}
+</div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -726,7 +800,7 @@ function ApprovalRuleDialog({
               onChange={(e) =>
                 setValues((v) => ({ ...v, priority: e.target.value }))
               }
-             onKeyDown={(e) => handleEnter(e, 'create-rule')}
+              onKeyDown={(e) => handleEnter(e, 'create-rule')}
               disabled={isSubmitting}
             />
           </div>

@@ -62,6 +62,12 @@ function CategoriesPage() {
   const [monthlyLimitInput, setMonthlyLimitInput] = useState('');
   const [receiptAmountInput, setReceiptAmountInput] = useState('');
 
+  // Monthly limit validation error
+  const [monthlyLimitError, setMonthlyLimitError] = useState('');
+
+  const [categorySuggestions, setCategorySuggestions] = useState<
+    typeof filtered[number][]
+  >([]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -78,7 +84,19 @@ function CategoriesPage() {
   /*
    * Filter categories by Active / Inactive
    */
-  const statusFiltered = filtered.filter(item =>
+  const searchFiltered = filtered.filter(item => {
+    const searchValue = search.trim().toLowerCase();
+
+    if (!searchValue) return true;
+
+    return (
+      item.name?.toLowerCase().includes(searchValue) ||
+      item.code?.toLowerCase().includes(searchValue) ||
+      item.description?.toLowerCase().includes(searchValue)
+    );
+  });
+
+  const statusFiltered = searchFiltered.filter(item =>
     statusFilter === 'active'
       ? item.active
       : !item.active
@@ -120,6 +138,7 @@ function CategoriesPage() {
         ?.focus();
     }
   };
+
   /*
    * Reset amount input values
    */
@@ -127,12 +146,63 @@ function CategoriesPage() {
     setDailyLimitInput('');
     setMonthlyLimitInput('');
     setReceiptAmountInput('');
+    setMonthlyLimitError('');
+  };
+
+  /*
+   * Validate Monthly Limit
+   *
+   * Maximum Monthly Limit = Daily Limit × 30
+   */
+  const validateMonthlyLimit = (
+    dailyValue: string,
+    monthlyValue: string
+  ) => {
+    // No validation if either limit is empty
+    if (
+      !dailyValue ||
+      dailyValue === '.' ||
+      !monthlyValue ||
+      monthlyValue === '.'
+    ) {
+      setMonthlyLimitError('');
+      return true;
+    }
+
+    const dailyLimit = Number(dailyValue);
+    const monthlyLimit = Number(monthlyValue);
+
+    const maximumMonthlyLimit = dailyLimit * 30;
+
+    if (monthlyLimit > maximumMonthlyLimit) {
+      setMonthlyLimitError(
+        `Monthly limit cannot exceed ₹${maximumMonthlyLimit.toLocaleString(
+          'en-IN'
+        )}`
+      );
+
+      return false;
+    }
+
+    setMonthlyLimitError('');
+
+    return true;
   };
 
   /*
    * Save category
    */
   async function handleSave() {
+    // Validate monthly limit before saving
+    const monthlyLimitValid = validateMonthlyLimit(
+      dailyLimitInput,
+      monthlyLimitInput
+    );
+
+    if (!monthlyLimitValid) {
+      return;
+    }
+
     if (editing.id) {
       setConfirmUpdate(true);
       return;
@@ -171,27 +241,34 @@ function CategoriesPage() {
     item: typeof filtered[number]
   ) => {
     // Daily limit
-    setDailyLimitInput(
+    const dailyValue =
       item.daily_limit_amount !== undefined &&
         item.daily_limit_amount !== null
         ? String(item.daily_limit_amount)
-        : ''
-    );
+        : '';
 
     // Monthly limit
-    setMonthlyLimitInput(
+    const monthlyValue =
       item.monthly_limit_amount !== undefined &&
         item.monthly_limit_amount !== null
         ? String(item.monthly_limit_amount)
-        : ''
-    );
+        : '';
 
     // Receipt amount
-    setReceiptAmountInput(
+    const receiptValue =
       item.receipt_required_above_amount !== undefined &&
         item.receipt_required_above_amount !== null
         ? String(item.receipt_required_above_amount)
-        : ''
+        : '';
+
+    setDailyLimitInput(dailyValue);
+    setMonthlyLimitInput(monthlyValue);
+    setReceiptAmountInput(receiptValue);
+
+    // Validate existing values when editing
+    validateMonthlyLimit(
+      dailyValue,
+      monthlyValue
     );
 
     openEdit(item);
@@ -244,7 +321,9 @@ function CategoriesPage() {
               aria-checked={statusFilter === 'active'}
               onClick={() =>
                 setStatusFilter(
-                  statusFilter === 'active' ? 'inactive' : 'active'
+                  statusFilter === 'active'
+                    ? 'inactive'
+                    : 'active'
                 )
               }
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${statusFilter === 'active'
@@ -261,7 +340,9 @@ function CategoriesPage() {
             </button>
 
             <span className="text-sm font-medium text-slate-600">
-              {statusFilter === 'active' ? 'Active' : 'Deactive'}
+              {statusFilter === 'active'
+                ? 'Active'
+                : 'Deactive'}
             </span>
           </div>
 
@@ -287,10 +368,11 @@ function CategoriesPage() {
           />
 
           <input
-            value={search}
-            onChange={e =>
-              setSearch(e.target.value)
-            }
+            type="text"
+            value={search ?? ''}
+            onChange={(e) => {
+              setSearch(e.target.value);
+            }}
             placeholder="Search categories..."
             className="input pl-9"
           />
@@ -497,7 +579,9 @@ function CategoriesPage() {
                           }`}
                       />
 
-                      {item.active ? 'Active' : 'Deactive'}
+                      {item.active
+                        ? 'Active'
+                        : 'Deactive'}
                     </span>
                   </td>
 
@@ -510,11 +594,16 @@ function CategoriesPage() {
                       {item.active && (
                         <button
                           type="button"
-                          onClick={() => handleEdit(item)}
+                          onClick={() =>
+                            handleEdit(item)
+                          }
                           title="Edit"
                           className="cc-action-btn group relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:shadow-md"
                         >
-                          <Edit2 size={13} strokeWidth={2} />
+                          <Edit2
+                            size={13}
+                            strokeWidth={2}
+                          />
 
                           <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                             Edit
@@ -617,7 +706,7 @@ function CategoriesPage() {
         <div className="space-y-4">
 
           {/* NAME */}
-          <div>
+          <div className="relative">
 
             <label className="label">
               Category Name *
@@ -639,9 +728,77 @@ function CategoriesPage() {
                 setEditing({
                   name: value,
                 });
+
+                // Suggestions only while creating a new category
+                if (!editing.id && value.trim()) {
+                  const searchValue =
+                    value.trim().toLowerCase();
+
+                  const matches = state.items.filter(
+                    item =>
+                      item.name
+                        .toLowerCase()
+                        .includes(searchValue)
+                  );
+
+                  setCategorySuggestions(matches);
+                } else {
+                  setCategorySuggestions([]);
+                }
               }}
               onKeyDown={handleEnterNextField}
+              onBlur={() => {
+                // Small delay so suggestion can be clicked
+                setTimeout(
+                  () => setCategorySuggestions([]),
+                  150
+                );
+              }}
             />
+
+            {!editing.id &&
+              categorySuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+
+                  <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    Existing categories
+                  </div>
+
+                  {categorySuggestions.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      onMouseDown={e =>
+                        e.preventDefault()
+                      }
+                      onClick={() => {
+                        setEditing({
+                          name: item.name,
+                        });
+                        setCategorySuggestions([]);
+                      }}
+                    >
+                      <span className="flex items-center gap-2 font-medium">
+                        <span
+                          className="h-3 w-3 rounded-full"
+                          style={{
+                            backgroundColor: item.color,
+                          }}
+                        />
+                        {item.name}
+                      </span>
+
+                      {item.active && (
+                        <span className="text-[10px] text-emerald-600">
+                          Active
+                        </span>
+                      )}
+                    </button>
+                  ))}
+
+                </div>
+              )}
 
           </div>
 
@@ -698,6 +855,13 @@ function CategoriesPage() {
                         ? undefined
                         : Number(value),
                   });
+
+                  // Revalidate monthly limit
+                  // whenever daily limit changes
+                  validateMonthlyLimit(
+                    value,
+                    monthlyLimitInput
+                  );
                 }}
                 onKeyDown={handleEnterNextField}
               />
@@ -714,7 +878,10 @@ function CategoriesPage() {
               <input
                 type="text"
                 inputMode="decimal"
-                className="input category-form-field"
+                className={`input category-form-field ${monthlyLimitError
+                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                  : ''
+                  }`}
                 placeholder="No limit"
                 value={monthlyLimitInput}
                 onChange={e => {
@@ -732,9 +899,35 @@ function CategoriesPage() {
                         ? undefined
                         : Number(value),
                   });
+
+                  // Validate monthly against
+                  // daily × 30
+                  validateMonthlyLimit(
+                    dailyLimitInput,
+                    value
+                  );
                 }}
                 onKeyDown={handleEnterNextField}
               />
+
+              {/* VALIDATION ERROR */}
+              {monthlyLimitError && (
+                <p className="mt-1 text-xs text-red-600">
+                  {monthlyLimitError}
+                </p>
+              )}
+
+              {/* MAXIMUM MONTHLY LIMIT */}
+              {!monthlyLimitError &&
+                dailyLimitInput &&
+                dailyLimitInput !== '.' && (
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Maximum monthly limit: ₹
+                    {(
+                      Number(dailyLimitInput) * 30
+                    ).toLocaleString('en-IN')}
+                  </p>
+                )}
 
             </div>
 
@@ -773,10 +966,13 @@ function CategoriesPage() {
 
               <input
                 type="checkbox"
-                checked={editing.approval_required ?? false}
+                checked={
+                  editing.approval_required ?? false
+                }
                 onChange={e =>
                   setEditing({
-                    approval_required: e.target.checked,
+                    approval_required:
+                      e.target.checked,
                   })
                 }
                 onKeyDown={handleEnterNextField}
@@ -794,10 +990,13 @@ function CategoriesPage() {
 
               <input
                 type="checkbox"
-                checked={editing.receipt_required ?? false}
+                checked={
+                  editing.receipt_required ?? false
+                }
                 onChange={e =>
                   setEditing({
-                    receipt_required: e.target.checked,
+                    receipt_required:
+                      e.target.checked,
                   })
                 }
                 onKeyDown={handleEnterNextField}
@@ -829,8 +1028,7 @@ function CategoriesPage() {
                 value={receiptAmountInput}
                 onChange={e => {
 
-                  const value =
-                    e.target.value;
+                  const value = e.target.value;
 
                   if (
                     !/^\d*\.?\d{0,2}$/.test(

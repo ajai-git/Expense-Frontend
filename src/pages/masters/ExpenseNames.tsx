@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Plus, Edit2, Search, FileText, Users, Truck, Camera, PowerOff, Power, Loader2, AlertCircle } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
-import { ColorBadge} from '../../components/ui/Badge';
+import { ColorBadge } from '../../components/ui/Badge';
 import { ExpenseNamesProvider, useExpenseNames } from '../../store/expenseNamesSlice';
 import { ExpenseName } from '../../types';
 
 function ExpenseNamesPage() {
+
   const { state, filtered, setSearch, setFilterCat, setStatusFilter, openEdit, closeModal, setEditing, save, toggleActive } =
     useExpenseNames();
 
@@ -22,6 +23,8 @@ function ExpenseNamesPage() {
   const [selectedExpenseName, setSelectedExpenseName] =
 
     useState<ExpenseName | null>(null);
+
+  const [expenseSuggestions, setExpenseSuggestions] = useState<ExpenseName[]>([]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -135,14 +138,14 @@ function ExpenseNamesPage() {
                 )
               }
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${statusFilter === 'active'
-                  ? 'bg-[var(--brand-600)]'
-                  : 'bg-slate-300'
+                ? 'bg-[var(--brand-600)]'
+                : 'bg-slate-300'
                 }`}
             >
               <span
                 className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ${statusFilter === 'active'
-                    ? 'translate-x-5'
-                    : 'translate-x-0'
+                  ? 'translate-x-5'
+                  : 'translate-x-0'
                   }`}
               />
             </button>
@@ -254,8 +257,8 @@ function ExpenseNamesPage() {
                 <td className="table-cell">
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold ${item.active
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-red-50 text-red-600'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-red-50 text-red-600'
                       }`}
                   >
                     <span
@@ -268,33 +271,33 @@ function ExpenseNamesPage() {
                 <td className="table-cell text-right">
                   <div className="flex items-center justify-end gap-1">
                     {item.active && (
-                    <button
-                      onClick={() => {
-                        if (!item.active) return;
+                      <button
+                        onClick={() => {
+                          if (!item.active) return;
 
-                        setDefaultAmountInput(
-                          item.default_amount !== undefined &&
-                            item.default_amount !== null
-                            ? String(item.default_amount)
-                            : ''
-                        );
+                          setDefaultAmountInput(
+                            item.default_amount !== undefined &&
+                              item.default_amount !== null
+                              ? String(item.default_amount)
+                              : ''
+                          );
 
-                        openEdit(item);
-                      }}
-                      title={item.active ? 'Edit' : 'Inactive items cannot be edited'}
-                      disabled={!item.active}
-                      className={`cc-action-btn group relative inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm transition-all
+                          openEdit(item);
+                        }}
+                        title={item.active ? 'Edit' : 'Inactive items cannot be edited'}
+                        disabled={!item.active}
+                        className={`cc-action-btn group relative inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm transition-all
     ${item.active
-                          ? 'border-slate-200 bg-white text-slate-500 hover:shadow-md'
-                          : 'border-slate-200 bg-slate-100 text-slate-300 cursor-not-allowed opacity-50'
-                        }`}
-                    >
-                      <Edit2 size={13} strokeWidth={2} />
+                            ? 'border-slate-200 bg-white text-slate-500 hover:shadow-md'
+                            : 'border-slate-200 bg-slate-100 text-slate-300 cursor-not-allowed opacity-50'
+                          }`}
+                      >
+                        <Edit2 size={13} strokeWidth={2} />
 
-                      <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                        {item.active ? 'Edit' : 'Inactive - Cannot Edit'}
-                      </span>
-                    </button>
+                        <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                          {item.active ? 'Edit' : 'Inactive - Cannot Edit'}
+                        </span>
+                      </button>
                     )}
 
                     <button
@@ -384,8 +387,9 @@ function ExpenseNamesPage() {
             </select>
           </div>
 
-          <div>
+          <div className="relative">
             <label className="label">Expense Name *</label>
+
             <input
               name="expense-name"
               className="input expense-form-field"
@@ -395,16 +399,64 @@ function ExpenseNamesPage() {
                 const value = e.target.value;
 
                 // Allow only letters and spaces
-                if (!/^[A-Za-z\s]*$/.test(value)) {
+                if (!/^[A-Za-z0-9\s]*$/.test(value)) {
                   return;
                 }
 
                 setEditing({
                   name: value,
                 });
+
+                // Suggestions only while creating a new expense
+                if (!editing.id && value.trim()) {
+                  const searchValue = value.trim().toLowerCase();
+
+                  const matches = state.items.filter(item =>
+                    item.name.toLowerCase().includes(searchValue)
+                  );
+
+                  setExpenseSuggestions(matches);
+                } else {
+                  setExpenseSuggestions([]);
+                }
               }}
               onKeyDown={handleEnterNextField}
+              onBlur={() => {
+                // Small delay so clicking a suggestion works
+                setTimeout(() => setExpenseSuggestions([]), 150);
+              }}
             />
+
+            {!editing.id && expenseSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  Existing expense names
+                </div>
+
+                {expenseSuggestions.map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => {
+                      setEditing({
+                        name: item.name,
+                      });
+                      setExpenseSuggestions([]);
+                    }}
+                  >
+                    <span className="font-medium">{item.name}</span>
+
+                    {item.active && (
+                      <span className="text-[10px] text-emerald-600">
+                        Active
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
