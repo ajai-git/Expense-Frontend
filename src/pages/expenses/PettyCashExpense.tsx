@@ -16,7 +16,6 @@ import {
   Route,
   ShieldCheck,
   AlertTriangle,
-  CheckCircle2,
   ChevronDown,
   FileText,
 } from 'lucide-react';
@@ -33,14 +32,25 @@ import {
 } from '../../types';
 
 import { getLocations } from '../../lib/locationApi';
+import { getEmployees } from '../../lib/employeeApi';
+
+// ============================================================
+// Employee API
+// ============================================================
+
+
 
 // ============================================================
 // Types
 // ============================================================
 
+
 interface Location {
   locationId: string;
   branchName: string;
+  aliasName?: string;
+  status?: string;
+  type?: string;
   [key: string]: unknown;
 }
 
@@ -70,6 +80,9 @@ interface FormState {
 // Utilities
 // ============================================================
 
+
+
+
 function formatCurrency(n: number): string {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -79,7 +92,9 @@ function formatCurrency(n: number): string {
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
-  const res = await apiRequest(path, { method: 'GET' });
+  const res = await apiRequest(path, {
+    method: 'GET',
+  });
 
   return (
     res &&
@@ -98,11 +113,18 @@ const theme = {
   light: {
     background:
       'bg-gradient-to-br from-slate-50 via-white to-indigo-50/30',
+
     card: 'bg-white',
+
     cardBorder: 'border-slate-200/80',
-    cardHover: 'hover:border-slate-300 hover:bg-slate-50',
+
+    cardHover:
+      'hover:border-slate-300 hover:bg-slate-50',
+
     cardShadow: 'shadow-sm',
-    header: 'bg-white/95 border-slate-200/80',
+
+    header:
+      'bg-white/95 border-slate-200/80',
 
     text: {
       primary: 'text-slate-800',
@@ -112,9 +134,12 @@ const theme = {
     },
 
     input: {
-      base: 'border-slate-200 bg-slate-50/50',
+      base:
+        'border-slate-200 bg-slate-50/50',
+
       focus:
         'border-indigo-400 ring-4 ring-indigo-50 bg-indigo-50/30',
+
       error:
         'border-red-300 bg-red-50 ring-4 ring-red-50 text-red-600',
     },
@@ -122,8 +147,10 @@ const theme = {
     button: {
       primary:
         'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 hover:from-indigo-700 hover:to-purple-700',
+
       secondary:
         'bg-white text-indigo-600 border-2 border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50',
+
       outline:
         'border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50',
     },
@@ -139,11 +166,19 @@ const theme = {
   dark: {
     background:
       'bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900/30',
+
     card: 'bg-slate-800',
-    cardBorder: 'border-slate-700/80',
-    cardHover: 'hover:border-slate-600 hover:bg-slate-700/50',
+
+    cardBorder:
+      'border-slate-700/80',
+
+    cardHover:
+      'hover:border-slate-600 hover:bg-slate-700/50',
+
     cardShadow: 'shadow-lg',
-    header: 'bg-slate-900/95 border-slate-700/80',
+
+    header:
+      'bg-slate-900/95 border-slate-700/80',
 
     text: {
       primary: 'text-slate-100',
@@ -153,9 +188,12 @@ const theme = {
     },
 
     input: {
-      base: 'border-slate-700 bg-slate-800/50',
+      base:
+        'border-slate-700 bg-slate-800/50',
+
       focus:
         'border-indigo-500 ring-4 ring-indigo-900/30 bg-slate-800',
+
       error:
         'border-red-600 bg-red-900/20 ring-4 ring-red-900/20 text-red-400',
     },
@@ -163,8 +201,10 @@ const theme = {
     button: {
       primary:
         'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-900/30 hover:shadow-xl hover:shadow-indigo-800/40 hover:from-indigo-600 hover:to-purple-600',
+
       secondary:
         'bg-slate-700 text-indigo-400 border-2 border-indigo-500/30 hover:border-indigo-400 hover:bg-slate-600',
+
       outline:
         'border-slate-600 text-slate-400 hover:text-slate-300 hover:bg-slate-700',
     },
@@ -186,41 +226,102 @@ export function PettyCashExpense() {
   const { notify, navigate } = useApp();
 
   const [isDark] = useState(false);
-  const currentTheme = isDark ? theme.dark : theme.light;
 
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-  const [expenseNames, setExpenseNames] = useState<ExpenseName[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const currentTheme = isDark
+    ? theme.dark
+    : theme.light;
 
-  const [session, setSession] = useState<CashSession | null>(null);
+  // ============================================================
+  // Master Data
+  // ============================================================
+
+  const [locations, setLocations] =
+    useState<Location[]>([]);
+
+  const [categories, setCategories] =
+    useState<ExpenseCategory[]>([]);
+
+  const [expenseNames, setExpenseNames] =
+    useState<ExpenseName[]>([]);
+
+  const [employees, setEmployees] =
+    useState<Employee[]>([]);
+
+  const [drivers, setDrivers] =
+    useState<Driver[]>([]);
+
+  const [vehicles, setVehicles] =
+    useState<Vehicle[]>([]);
+
+  // ============================================================
+  // Employee Loading
+  // ============================================================
+
+  const [loadingEmployees, setLoadingEmployees] =
+    useState(false);
+
+  // ============================================================
+  // Session
+  // ============================================================
+
+  const [session, setSession] =
+    useState<CashSession | null>(null);
+
   const [selectedExpenseName, setSelectedExpenseName] =
     useState<ExpenseName | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // ============================================================
+  // Page Loading / Saving
+  // ============================================================
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
   const [focusedField, setFocusedField] =
     useState<string | null>(null);
 
-  const [form, setForm] = useState<FormState>({
-    date: new Date().toISOString().split('T')[0],
-    location_id: '',
-    category_id: '',
-    expense_name_id: '',
-    amount: '',
-    payment_mode: 'cash',
-    remarks: '',
-    driver_id: '',
-    vehicle_id: '',
-    route_id: '',
-    employee_ids: [],
-    reference_number: '',
-  });
+  // ============================================================
+  // Form
+  // ============================================================
+
+  const [form, setForm] =
+    useState<FormState>({
+      date: new Date()
+        .toISOString()
+        .split('T')[0],
+
+      location_id: '',
+
+      category_id: '',
+
+      expense_name_id: '',
+
+      amount: '',
+
+      payment_mode: 'cash',
+
+      remarks: '',
+
+      driver_id: '',
+
+      vehicle_id: '',
+
+      route_id: '',
+
+      employee_ids: [],
+
+      reference_number: '',
+    });
 
   // ============================================================
   // Load Master Data
+  //
+  // IMPORTANT:
+  // Employees are intentionally NOT loaded here.
+  // They will only load when an expense requires employees.
   // ============================================================
 
   useEffect(() => {
@@ -229,34 +330,135 @@ export function PettyCashExpense() {
 
       try {
         const [
-          locationData,
-          categoryData,
-          employeeData,
-          driverData,
-          vehicleData,
-        ] = await Promise.all([
+          locationResult,
+          categoryResult,
+          driverResult,
+          vehicleResult,
+        ] = await Promise.allSettled([
           getLocations(),
+
           fetchJson<ExpenseCategory[]>(
             '/api/v1/masters/categories?active_only=true',
           ),
-          fetchJson<Employee[]>('/db/employees/query').catch(
-            () => [] as Employee[],
+
+          fetchJson<Driver[]>(
+            '/db/drivers/query',
           ),
-          fetchJson<Driver[]>('/db/drivers/query').catch(
-            () => [] as Driver[],
-          ),
-          fetchJson<Vehicle[]>('/db/vehicles/query').catch(
-            () => [] as Vehicle[],
+
+          fetchJson<Vehicle[]>(
+            '/db/vehicles/query',
           ),
         ]);
 
-        setLocations((locationData ?? []) as Location[]);
-        setCategories(categoryData ?? []);
-        setEmployees(employeeData ?? []);
-        setDrivers(driverData ?? []);
-        setVehicles(vehicleData ?? []);
-      } catch {
-        notify('Failed to load master data', 'error');
+        // ========================================================
+        // Locations
+        // ========================================================
+
+        if (locationResult.status === 'fulfilled') {
+          const data = locationResult.value ?? [];
+
+          const normalizedLocations: Location[] = data
+            .map((location: any) => ({
+              locationId:
+                location.locationId ??
+                location.location_id ??
+                location.id ??
+                '',
+
+              branchName:
+                location.branchName ??
+                location.branch_name ??
+                location.name ??
+                '',
+
+              aliasName:
+                location.aliasName ??
+                location.alias_name ??
+                '',
+
+              status: location.status,
+              type: location.type,
+            }))
+            .filter(
+              location =>
+                location.locationId &&
+                (
+                  !location.status ||
+                  location.status.toLowerCase() === 'active'
+                )
+            );
+
+          setLocations(normalizedLocations);
+        } else {
+          console.error(
+            'Location API failed:',
+            locationResult.reason,
+          );
+
+          setLocations([]);
+        }
+
+        // ========================================================
+        // Categories
+        // ========================================================
+
+        if (categoryResult.status === 'fulfilled') {
+          setCategories(
+            categoryResult.value ?? [],
+          );
+        } else {
+          console.error(
+            'Category API failed:',
+            categoryResult.reason,
+          );
+
+          setCategories([]);
+        }
+
+        // ========================================================
+        // Drivers
+        // ========================================================
+
+        if (driverResult.status === 'fulfilled') {
+          setDrivers(
+            driverResult.value ?? [],
+          );
+        } else {
+          console.error(
+            'Driver API failed:',
+            driverResult.reason,
+          );
+
+          setDrivers([]);
+        }
+
+        // ========================================================
+        // Vehicles
+        // ========================================================
+
+        if (vehicleResult.status === 'fulfilled') {
+          setVehicles(
+            vehicleResult.value ?? [],
+          );
+        } else {
+          console.error(
+            'Vehicle API failed:',
+            vehicleResult.reason,
+          );
+
+          setVehicles([]);
+        }
+
+      } catch (error) {
+        console.error(
+          'Master data loading error:',
+          error,
+        );
+
+        notify(
+          'Failed to load master data',
+          'error',
+        );
       } finally {
         setLoading(false);
       }
@@ -273,63 +475,182 @@ export function PettyCashExpense() {
     if (!form.category_id) {
       setExpenseNames([]);
       setSelectedExpenseName(null);
+
+      // Clear employee data because no expense is selected
+      setEmployees([]);
+      setForm(p => ({
+        ...p,
+        expense_name_id: '',
+        employee_ids: [],
+        amount: '',
+        remarks: '',
+      }));
+
       return;
     }
 
     fetchJson<ExpenseName[]>(
       `/api/v1/masters/expense-names?active_only=true&category_id=${form.category_id}`,
     )
-      .then(data => setExpenseNames(data ?? []))
-      .catch(() =>
-        notify('Failed to load expense names', 'error'),
-      );
+      .then(data => {
+        setExpenseNames(data ?? []);
+      })
+      .catch(() => {
+        notify(
+          'Failed to load expense names',
+          'error',
+        );
+      });
 
+    // Reset dependent fields
     setForm(p => ({
       ...p,
       expense_name_id: '',
+      employee_ids: [],
       amount: '',
       remarks: '',
     }));
 
     setSelectedExpenseName(null);
-  }, [form.category_id, notify]);
+
+    // Clear employees until selected expense requires them
+    setEmployees([]);
+  }, [
+    form.category_id,
+    notify,
+  ]);
 
   // ============================================================
   // Apply Defaults When Expense Name Changes
+  //
+  // This effect determines whether employees are required.
+  // Employees are loaded ONLY if required.
   // ============================================================
 
   useEffect(() => {
     if (!form.expense_name_id) {
       setSelectedExpenseName(null);
+
+      // No expense selected -> no employees needed
+      setEmployees([]);
+
+      setForm(p => ({
+        ...p,
+        employee_ids: [],
+      }));
+
       return;
     }
 
     const found =
-      expenseNames.find(e => e.id === form.expense_name_id) ?? null;
+      expenseNames.find(
+        e =>
+          e.id ===
+          form.expense_name_id,
+      ) ?? null;
 
     setSelectedExpenseName(found);
 
     if (found) {
       setForm(p => ({
         ...p,
+
         amount: found.default_amount
           ? String(found.default_amount)
           : p.amount,
-        remarks: found.default_remarks ?? p.remarks,
+
+        remarks:
+          found.default_remarks ??
+          p.remarks,
+
+        // Clear old employee selections
+        // whenever expense changes
+        employee_ids: [],
       }));
     }
-  }, [form.expense_name_id, expenseNames]);
+  }, [
+    form.expense_name_id,
+    expenseNames,
+  ]);
 
+  // ============================================================
+  // Load Employees ONLY When Required
+  // ============================================================
+
+  useEffect(() => {
+    const employeeRequired =
+      !!selectedExpenseName?.employee_required;
+
+    if (!employeeRequired) {
+      setEmployees([]);
+      setLoadingEmployees(false);
+
+      setForm(p => ({
+        ...p,
+        employee_ids: [],
+      }));
+
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadEmployees() {
+      setLoadingEmployees(true);
+
+      try {
+        const data =
+          await getEmployees();
+
+        if (!cancelled) {
+          setEmployees(data ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setEmployees([]);
+
+          notify(
+            'Failed to load employees',
+            'error',
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingEmployees(false);
+        }
+      }
+    }
+
+    loadEmployees();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedExpenseName?.employee_required,
+    notify,
+  ]);
+
+  const [employeeSearch, setEmployeeSearch] =
+    useState('');
+
+  const [employeePosition, setEmployeePosition] =
+    useState('');
   // ============================================================
   // Auto Assign Vehicle When Driver Changes
   // ============================================================
 
   useEffect(() => {
-    if (!form.driver_id) return;
+    if (!form.driver_id) {
+      return;
+    }
 
-    const match = vehicles.find(
-      v => v.driver_id === form.driver_id,
-    );
+    const match =
+      vehicles.find(
+        v =>
+          v.driver_id ===
+          form.driver_id,
+      );
 
     if (match) {
       setForm(p => ({
@@ -337,10 +658,13 @@ export function PettyCashExpense() {
         vehicle_id: match.id,
       }));
     }
-  }, [form.driver_id, vehicles]);
+  }, [
+    form.driver_id,
+    vehicles,
+  ]);
 
   // ============================================================
-  // Load Open Cash Session For Location + Date
+  // Load Open Cash Session
   // ============================================================
 
   useEffect(() => {
@@ -363,31 +687,32 @@ export function PettyCashExpense() {
             field: 'location_id',
             value: form.location_id,
           },
-          {
-            op: 'eq',
-            field: 'status',
-            value: 'open',
-          },
         ],
-        limit: 1,
+        limit: 10,
       }),
     })
       .then((res: unknown) => {
-        const maybeObj =
-          typeof res === 'object' && res !== null
-            ? (res as Record<string, unknown>)
-            : null;
-
         const raw =
-          maybeObj && 'data' in maybeObj
-            ? maybeObj.data
+          res &&
+            typeof res === 'object' &&
+            'data' in res
+            ? (res as { data: unknown }).data
             : res;
 
-        const rows = Array.isArray(raw) ? raw : [];
+        const rows = Array.isArray(raw)
+          ? raw as CashSession[]
+          : [];
 
-        setSession(rows[0] ?? null);
+        const activeSession =
+          rows.find(
+            row => row.status?.toLowerCase() === 'open',
+          ) ?? null;
+
+        setSession(activeSession);
       })
-      .catch(() => setSession(null));
+      .catch(() => {
+        setSession(null);
+      });
   }, [form.location_id, form.date]);
 
   // ============================================================
@@ -407,28 +732,50 @@ export function PettyCashExpense() {
     [],
   );
 
-  function toggleEmployee(id: string) {
+  function toggleEmployee(
+    id: string,
+  ) {
     setForm(p => ({
       ...p,
-      employee_ids: p.employee_ids.includes(id)
-        ? p.employee_ids.filter(e => e !== id)
-        : [...p.employee_ids, id],
+
+      employee_ids:
+        p.employee_ids.includes(id)
+          ? p.employee_ids.filter(
+            e => e !== id,
+          )
+          : [
+            ...p.employee_ids,
+            id,
+          ],
     }));
   }
 
   // ============================================================
-  // Computed
+  // Computed Values
   // ============================================================
 
   const amount = parseFloat(form.amount) || 0;
+  const needsEmployee = !!selectedExpenseName?.employee_required;
+  const employeeCount = needsEmployee ? form.employee_ids.length : 1;
+  const totalAmount = amount * employeeCount;
 
-  const hasInsufficientCash =
-    form.payment_mode === 'cash' &&
-    session != null &&
-    amount > session.system_balance;
+  const selectedCategory =
+    categories.find(
+      c =>
+        c.id ===
+        form.category_id,
+    ) ?? null;
 
-  const needsEmployee =
-    !!selectedExpenseName?.employee_required;
+  const dailyLimit = Number(
+    selectedCategory
+      ?.daily_limit_amount ?? 0,
+  );
+
+
+
+  const exceedsDailyLimit =
+    dailyLimit > 0 && totalAmount > dailyLimit;
+
 
   const needsDriver =
     !!selectedExpenseName?.driver_required;
@@ -436,38 +783,135 @@ export function PettyCashExpense() {
   const needsVehicle =
     !!selectedExpenseName?.vehicle_required;
 
+  const needsRoute =
+    !!selectedExpenseName?.route_required;
+
+  const needsReceipt =
+    !!selectedExpenseName?.receipt_required;
+
   const needsApproval =
     !!selectedExpenseName?.approval_required ||
-    !!(
-      categories.find(c => c.id === form.category_id)
-        ?.approval_required
-    );
+    !!selectedCategory?.approval_required;
+
+  const hasInsufficientCash =
+    form.payment_mode === 'cash' &&
+    session != null &&
+    totalAmount > session.system_balance;
 
   const canSubmit =
     !!form.location_id &&
+    !!form.category_id &&
     !!form.expense_name_id &&
     !!form.amount &&
     amount > 0 &&
     !hasInsufficientCash &&
-    !(needsEmployee && form.employee_ids.length === 0) &&
-    !(needsDriver && !form.driver_id);
+    !exceedsDailyLimit &&
+    !(
+      needsEmployee &&
+      form.employee_ids.length === 0
+    ) &&
+    !(
+      needsDriver &&
+      !form.driver_id
+    ) &&
+    !(
+      needsVehicle &&
+      !form.vehicle_id
+    ) &&
+    !(
+      needsRoute &&
+      !form.route_id.trim()
+    );
+
+
+  const employeePositions = Array.from(
+    new Set(
+      employees
+        .map(emp => emp.department?.trim())
+        .filter((position): position is string => !!position),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch = emp.name
+      .toLowerCase()
+      .includes(employeeSearch.trim().toLowerCase());
+
+    const matchesPosition =
+      !employeePosition ||
+      emp.department === employeePosition;
+
+    return matchesSearch && matchesPosition;
+  });
 
   // ============================================================
-  // Submit
+  // Submit Expense
   // ============================================================
 
-  async function submitExpense(asDraft: boolean) {
-    if (
-      !form.location_id ||
-      !form.expense_name_id ||
-      !form.amount
-    ) {
+  async function submitExpense(
+    asDraft: boolean,
+  ) {
+    // ----------------------------------------------------------
+    // Basic Validation
+    // ----------------------------------------------------------
+
+    if (!form.location_id) {
       notify(
-        'Location, expense name, and amount are required',
+        'Please select a location',
         'error',
       );
-      return;
+      return null;
     }
+
+    if (!form.category_id) {
+      notify(
+        'Please select a category',
+        'error',
+      );
+      return null;
+    }
+
+    if (!form.expense_name_id) {
+      notify(
+        'Please select an expense',
+        'error',
+      );
+      return null;
+    }
+
+    if (!form.amount) {
+      notify(
+        'Please enter an amount',
+        'error',
+      );
+      return null;
+    }
+
+    if (amount <= 0) {
+      notify(
+        'Amount must be greater than 0',
+        'error',
+      );
+      return null;
+    }
+
+    // ----------------------------------------------------------
+    // Daily Limit
+    // ----------------------------------------------------------
+
+    if (exceedsDailyLimit) {
+      notify(
+        `Amount cannot exceed the daily limit of ${formatCurrency(
+          dailyLimit,
+        )}`,
+        'error',
+      );
+      return null;
+    }
+
+    // ----------------------------------------------------------
+    // Employee Validation
+    // ----------------------------------------------------------
 
     if (
       needsEmployee &&
@@ -477,66 +921,171 @@ export function PettyCashExpense() {
         'Please select at least one employee',
         'error',
       );
-      return;
+      return null;
     }
 
-    if (needsDriver && !form.driver_id) {
-      notify('Please select a driver', 'error');
-      return;
+    // ----------------------------------------------------------
+    // Driver Validation
+    // ----------------------------------------------------------
+
+    if (
+      needsDriver &&
+      !form.driver_id
+    ) {
+      notify(
+        'Please select a driver',
+        'error',
+      );
+      return null;
     }
+
+    // ----------------------------------------------------------
+    // Vehicle Validation
+    // ----------------------------------------------------------
+
+    if (
+      needsVehicle &&
+      !form.vehicle_id
+    ) {
+      notify(
+        'Please select a vehicle',
+        'error',
+      );
+      return null;
+    }
+
+    // ----------------------------------------------------------
+    // Route Validation
+    // ----------------------------------------------------------
+
+    if (
+      needsRoute &&
+      !form.route_id.trim()
+    ) {
+      notify(
+        'Please enter a route',
+        'error',
+      );
+      return null;
+    }
+
+    // ----------------------------------------------------------
+    // Cash Validation
+    // ----------------------------------------------------------
 
     if (hasInsufficientCash) {
-      notify('Insufficient cash balance', 'error');
-      return;
+      notify(
+        'Insufficient cash balance',
+        'error',
+      );
+      return null;
     }
+
+    // ----------------------------------------------------------
+    // Save
+    // ----------------------------------------------------------
 
     setSaving(true);
 
     try {
-      const payload: Record<string, unknown> = {
-        category_id: form.category_id,
-        expense_name_id: form.expense_name_id,
-        location_id: form.location_id,
+      const payload: Record<
+        string,
+        unknown
+      > = {
+        category_id:
+          form.category_id,
+
+        expense_name_id:
+          form.expense_name_id,
+
+        location_id:
+          form.location_id,
+
         amount,
-        date: form.date,
-        payment_mode: form.payment_mode,
-        employee_ids: form.employee_ids,
-        driver_id: form.driver_id || null,
-        vehicle_id: form.vehicle_id || null,
-        route_id: form.route_id || null,
-        remarks: form.remarks || null,
+
+        date:
+          form.date,
+
+        payment_mode:
+          form.payment_mode,
+
+        employee_ids:
+          form.employee_ids,
+
+        driver_id:
+          form.driver_id || null,
+
+        vehicle_id:
+          form.vehicle_id || null,
+
+        route_id:
+          form.route_id || null,
+
+        remarks:
+          form.remarks || null,
+
         reference_number:
-          form.reference_number || null,
+          form.reference_number ||
+          null,
       };
 
       const sessionParam =
-        form.payment_mode === 'cash' && session
+        form.payment_mode ===
+          'cash' &&
+          session
           ? `?cash_session_id=${session.id}`
           : '';
 
-      const res = await apiRequest(
-        `/api/v1/expenses/${sessionParam}`,
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        },
-      ) as
-        | { data?: Record<string, unknown> }
-        | Record<string, unknown>;
+      const res =
+        (await apiRequest(
+          `/api/v1/expenses${sessionParam}`,
+          {
+            method: 'POST',
 
-      const saved = (
+            body: JSON.stringify(
+              payload,
+            ),
+          },
+        )) as
+        | {
+          data?: Record<
+            string,
+            unknown
+          >;
+        }
+        | Record<
+          string,
+          unknown
+        >;
+
+      const saved =
         res &&
           typeof res === 'object' &&
           'data' in res
           ? res.data
-          : res
-      ) as Record<string, unknown>;
+          : res;
 
-      if (asDraft && saved?.id) {
+      const savedRecord =
+        saved as
+        | Record<
+          string,
+          unknown
+        >
+        | undefined;
+
+      // --------------------------------------------------------
+      // Draft
+      // --------------------------------------------------------
+
+      if (
+        asDraft &&
+        savedRecord?.id
+      ) {
         await apiRequest(
-          `/api/v1/expenses/${saved.id}`,
+          `/api/v1/expenses/${savedRecord.id}`,
           {
             method: 'PATCH',
+
             body: JSON.stringify({
               status: 'draft',
             }),
@@ -551,14 +1100,18 @@ export function PettyCashExpense() {
         'success',
       );
 
-      return saved;
+      return savedRecord;
     } catch (err: unknown) {
       const message =
         err instanceof Error
           ? err.message
           : 'Failed to submit expense';
 
-      notify(message, 'error');
+      notify(
+        message,
+        'error',
+      );
+
       return null;
     } finally {
       setSaving(false);
@@ -572,28 +1125,53 @@ export function PettyCashExpense() {
   async function handleSubmit(
     asDraft: boolean,
     addAnother = false,
-  ) {
-    const saved = await submitExpense(asDraft);
 
-    if (saved) {
-      if (addAnother) {
-        setForm({
-          date: form.date,
-          location_id: form.location_id,
-          category_id: '',
-          expense_name_id: '',
-          amount: '',
-          payment_mode: form.payment_mode,
-          remarks: '',
-          driver_id: '',
-          vehicle_id: '',
-          route_id: '',
-          employee_ids: [],
-          reference_number: '',
-        });
-      } else {
-        navigate('expenses/my');
-      }
+  ) {
+    const saved =
+      await submitExpense(
+        asDraft,
+      );
+
+    if (!saved) {
+      return;
+    }
+
+    if (addAnother) {
+      setForm({
+        date: form.date,
+
+        location_id:
+          form.location_id,
+
+        category_id: '',
+
+        expense_name_id: '',
+
+        amount: '',
+
+        payment_mode:
+          form.payment_mode,
+
+        remarks: '',
+
+        driver_id: '',
+
+        vehicle_id: '',
+
+        route_id: '',
+
+        employee_ids: [],
+
+        reference_number: '',
+      });
+
+      // Important:
+      // Remove employees after submitting
+      // because next expense hasn't been selected.
+      setEmployees([]);
+      setSelectedExpenseName(null);
+    } else {
+      navigate('expenses/my');
     }
   }
 
@@ -648,7 +1226,7 @@ export function PettyCashExpense() {
   }
 
   // ============================================================
-  // Payment Mode Config
+  // Payment Modes
   // ============================================================
 
   const paymentModes = [
@@ -682,7 +1260,9 @@ export function PettyCashExpense() {
     <div
       className={`min-h-screen ${currentTheme.background} transition-colors duration-300`}
     >
-      {/* Header */}
+      {/* ======================================================
+          HEADER
+      ====================================================== */}
 
       <div
         className={`sticky top-0 z-30 backdrop-blur-sm ${currentTheme.header} border-b transition-colors duration-300`}
@@ -698,7 +1278,9 @@ export function PettyCashExpense() {
             </div>
 
             <button
-              onClick={() => navigate('expenses/my')}
+              onClick={() =>
+                navigate('expenses/my')
+              }
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${currentTheme.button.outline} rounded-lg transition-all duration-200`}
             >
               <X size={14} />
@@ -708,16 +1290,22 @@ export function PettyCashExpense() {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* ======================================================
+          MAIN
+      ====================================================== */}
 
       <div className="max-w-full mx-auto px-4 lg:px-6 py-4">
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
 
-          {/* LEFT */}
+          {/* ==================================================
+              LEFT
+          ================================================== */}
 
           <div className="xl:col-span-8 space-y-4">
 
-            {/* Basic Details */}
+            {/* ==================================================
+                BASIC DETAILS
+            ================================================== */}
 
             <div
               className={`rounded-xl border ${currentTheme.cardBorder} ${currentTheme.card} ${currentTheme.cardShadow} overflow-hidden transition-colors duration-300`}
@@ -757,6 +1345,11 @@ export function PettyCashExpense() {
 
                     <input
                       type="date"
+                      max={
+                        new Date()
+                          .toISOString()
+                          .split('T')[0]
+                      }
                       className={`w-full px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 outline-none ${focusedField === 'date'
                         ? currentTheme.input.focus
                         : `${currentTheme.input.base} ${isDark
@@ -766,13 +1359,20 @@ export function PettyCashExpense() {
                         }`}
                       value={form.date}
                       onChange={e =>
-                        setField('date', e.target.value)
+                        setField(
+                          'date',
+                          e.target.value,
+                        )
                       }
                       onFocus={() =>
-                        setFocusedField('date')
+                        setFocusedField(
+                          'date',
+                        )
                       }
                       onBlur={() =>
-                        setFocusedField(null)
+                        setFocusedField(
+                          null,
+                        )
                       }
                     />
                   </div>
@@ -785,19 +1385,24 @@ export function PettyCashExpense() {
                     >
                       <Building2 size={12} />
                       Location
-                      <span className="text-red-400">*</span>
+                      <span className="text-red-400">
+                        *
+                      </span>
                     </label>
 
                     <div className="relative">
                       <select
-                        className={`w-full px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 outline-none appearance-none cursor-pointer ${focusedField === 'location_id'
+                        className={`w-full px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 outline-none appearance-none cursor-pointer ${focusedField ===
+                          'location_id'
                           ? currentTheme.input.focus
                           : `${currentTheme.input.base} ${isDark
                             ? 'text-slate-200'
                             : 'text-slate-700'
                           }`
                           }`}
-                        value={form.location_id}
+                        value={
+                          form.location_id
+                        }
                         onChange={e =>
                           setField(
                             'location_id',
@@ -805,24 +1410,36 @@ export function PettyCashExpense() {
                           )
                         }
                         onFocus={() =>
-                          setFocusedField('location_id')
+                          setFocusedField(
+                            'location_id',
+                          )
                         }
                         onBlur={() =>
-                          setFocusedField(null)
+                          setFocusedField(
+                            null,
+                          )
                         }
                       >
                         <option value="">
                           Select location
                         </option>
 
-                        {locations.map(location => (
-                          <option
-                            key={location.locationId}
-                            value={location.locationId}
-                          >
-                            {location.branchName}
-                          </option>
-                        ))}
+                        {locations.map(
+                          location => (
+                            <option
+                              key={
+                                location.locationId
+                              }
+                              value={
+                                location.locationId
+                              }
+                            >
+                              {
+                                location.branchName
+                              }
+                            </option>
+                          ),
+                        )}
                       </select>
 
                       <ChevronDown
@@ -843,44 +1460,59 @@ export function PettyCashExpense() {
                     </label>
 
                     <div className="grid grid-cols-4 gap-1">
-                      {paymentModes.map(pm => {
-                        const Icon = pm.icon;
-                        const active =
-                          form.payment_mode === pm.value;
+                      {paymentModes.map(
+                        pm => {
+                          const Icon =
+                            pm.icon;
 
-                        return (
-                          <button
-                            key={pm.value}
-                            type="button"
-                            onClick={() =>
-                              setField(
-                                'payment_mode',
-                                pm.value,
-                              )
-                            }
-                            className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border text-xs font-medium transition-all duration-200 ${active
-                              ? isDark
-                                ? 'border-indigo-400 bg-indigo-900/30 text-indigo-300 shadow-sm ring-2 ring-indigo-900/30'
-                                : 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm ring-2 ring-indigo-100'
-                              : `${currentTheme.cardBorder} ${currentTheme.card} ${currentTheme.text.muted} ${currentTheme.cardHover}`
-                              }`}
-                            title={pm.label}
-                          >
-                            <Icon size={12} />
+                          const active =
+                            form.payment_mode ===
+                            pm.value;
 
-                            <span className="truncate w-full text-center leading-tight text-[10px]">
-                              {pm.label}
-                            </span>
-                          </button>
-                        );
-                      })}
+                          return (
+                            <button
+                              key={
+                                pm.value
+                              }
+                              type="button"
+                              onClick={() =>
+                                setField(
+                                  'payment_mode',
+                                  pm.value,
+                                )
+                              }
+                              className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border text-xs font-medium transition-all duration-200 ${active
+                                ? isDark
+                                  ? 'border-indigo-400 bg-indigo-900/30 text-indigo-300 shadow-sm ring-2 ring-indigo-900/30'
+                                  : 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm ring-2 ring-indigo-100'
+                                : `${currentTheme.cardBorder} ${currentTheme.card} ${currentTheme.text.muted} ${currentTheme.cardHover}`
+                                }`}
+                              title={
+                                pm.label
+                              }
+                            >
+                              <Icon
+                                size={12}
+                              />
+
+                              <span className="truncate w-full text-center leading-tight text-[10px]">
+                                {
+                                  pm.label
+                                }
+                              </span>
+                            </button>
+                          );
+                        },
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Expense Details */}
+            {/* ==================================================
+                EXPENSE DETAILS
+            ================================================== */}
 
             <div
               className={`rounded-xl border ${currentTheme.cardBorder} ${currentTheme.card} ${currentTheme.cardShadow} overflow-hidden transition-colors duration-300`}
@@ -915,19 +1547,24 @@ export function PettyCashExpense() {
                       className={`flex items-center gap-1 text-xs font-medium ${currentTheme.text.muted} uppercase tracking-wider`}
                     >
                       Category
-                      <span className="text-red-400">*</span>
+                      <span className="text-red-400">
+                        *
+                      </span>
                     </label>
 
                     <div className="relative">
                       <select
-                        className={`w-full px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 outline-none appearance-none cursor-pointer ${focusedField === 'category_id'
+                        className={`w-full px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 outline-none appearance-none cursor-pointer ${focusedField ===
+                          'category_id'
                           ? currentTheme.input.focus
                           : `${currentTheme.input.base} ${isDark
                             ? 'text-slate-200'
                             : 'text-slate-700'
                           }`
                           }`}
-                        value={form.category_id}
+                        value={
+                          form.category_id
+                        }
                         onChange={e =>
                           setField(
                             'category_id',
@@ -935,24 +1572,30 @@ export function PettyCashExpense() {
                           )
                         }
                         onFocus={() =>
-                          setFocusedField('category_id')
+                          setFocusedField(
+                            'category_id',
+                          )
                         }
                         onBlur={() =>
-                          setFocusedField(null)
+                          setFocusedField(
+                            null,
+                          )
                         }
                       >
                         <option value="">
                           Select category
                         </option>
 
-                        {categories.map(c => (
-                          <option
-                            key={c.id}
-                            value={c.id}
-                          >
-                            {c.name}
-                          </option>
-                        ))}
+                        {categories.map(
+                          c => (
+                            <option
+                              key={c.id}
+                              value={c.id}
+                            >
+                              {c.name}
+                            </option>
+                          ),
+                        )}
                       </select>
 
                       <ChevronDown
@@ -969,7 +1612,9 @@ export function PettyCashExpense() {
                       className={`flex items-center gap-1 text-xs font-medium ${currentTheme.text.muted} uppercase tracking-wider`}
                     >
                       Expense
-                      <span className="text-red-400">*</span>
+                      <span className="text-red-400">
+                        *
+                      </span>
                     </label>
 
                     <div className="relative">
@@ -984,35 +1629,43 @@ export function PettyCashExpense() {
                               : 'text-slate-700'
                             }`
                           }`}
-                        value={form.expense_name_id}
+                        value={
+                          form.expense_name_id
+                        }
                         onChange={e =>
                           setField(
                             'expense_name_id',
                             e.target.value,
                           )
                         }
-                        disabled={!form.category_id}
+                        disabled={
+                          !form.category_id
+                        }
                         onFocus={() =>
                           setFocusedField(
                             'expense_name_id',
                           )
                         }
                         onBlur={() =>
-                          setFocusedField(null)
+                          setFocusedField(
+                            null,
+                          )
                         }
                       >
                         <option value="">
                           Select expense
                         </option>
 
-                        {expenseNames.map(e => (
-                          <option
-                            key={e.id}
-                            value={e.id}
-                          >
-                            {e.name}
-                          </option>
-                        ))}
+                        {expenseNames.map(
+                          e => (
+                            <option
+                              key={e.id}
+                              value={e.id}
+                            >
+                              {e.name}
+                            </option>
+                          ),
+                        )}
                       </select>
 
                       <ChevronDown
@@ -1028,9 +1681,13 @@ export function PettyCashExpense() {
                     <label
                       className={`flex items-center gap-1 text-xs font-medium ${currentTheme.text.muted} uppercase tracking-wider`}
                     >
-                      <IndianRupee size={12} />
+                      <IndianRupee
+                        size={12}
+                      />
                       Amount
-                      <span className="text-red-400">*</span>
+                      <span className="text-red-400">
+                        *
+                      </span>
                     </label>
 
                     <div className="relative">
@@ -1047,7 +1704,8 @@ export function PettyCashExpense() {
                         type="number"
                         className={`w-full pl-7 pr-3 py-2 rounded-lg border text-sm font-bold transition-all duration-200 outline-none ${hasInsufficientCash
                           ? currentTheme.input.error
-                          : focusedField === 'amount'
+                          : focusedField ===
+                            'amount'
                             ? currentTheme.input.focus
                             : `${currentTheme.input.base} ${isDark
                               ? 'text-slate-200'
@@ -1056,7 +1714,9 @@ export function PettyCashExpense() {
                           }`}
                         placeholder="0.00"
                         min={0}
-                        value={form.amount}
+                        value={
+                          form.amount
+                        }
                         onChange={e =>
                           setField(
                             'amount',
@@ -1064,12 +1724,41 @@ export function PettyCashExpense() {
                           )
                         }
                         onFocus={() =>
-                          setFocusedField('amount')
+                          setFocusedField(
+                            'amount',
+                          )
                         }
                         onBlur={() =>
-                          setFocusedField(null)
+                          setFocusedField(
+                            null,
+                          )
                         }
                       />
+
+                      {dailyLimit > 0 && (
+                        <div
+                          className={`mt-1 flex items-center justify-between text-[10px] ${exceedsDailyLimit
+                            ? 'text-red-500'
+                            : isDark
+                              ? 'text-slate-400'
+                              : 'text-slate-500'
+                            }`}
+                        >
+                          <span>
+                            Daily limit:{' '}
+                            {formatCurrency(
+                              dailyLimit,
+                            )}
+                          </span>
+
+                          {exceedsDailyLimit && (
+                            <span className="font-semibold">
+                              Amount exceeds
+                              limit
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1078,16 +1767,21 @@ export function PettyCashExpense() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
 
+                  {/* Remarks */}
+
                   <div className="space-y-1">
                     <label
                       className={`flex items-center gap-1 text-xs font-medium ${currentTheme.text.muted} uppercase tracking-wider`}
                     >
-                      <MessageSquare size={12} />
+                      <MessageSquare
+                        size={12}
+                      />
                       Remarks
                     </label>
 
                     <textarea
-                      className={`w-full px-3 py-2 rounded-lg border text-sm transition-all duration-200 outline-none resize-none ${focusedField === 'remarks'
+                      className={`w-full px-3 py-2 rounded-lg border text-sm transition-all duration-200 outline-none resize-none ${focusedField ===
+                        'remarks'
                         ? currentTheme.input.focus
                         : `${currentTheme.input.base} ${isDark
                           ? 'text-slate-200'
@@ -1096,7 +1790,9 @@ export function PettyCashExpense() {
                         }`}
                       rows={2}
                       placeholder="Optional remarks..."
-                      value={form.remarks}
+                      value={
+                        form.remarks
+                      }
                       onChange={e =>
                         setField(
                           'remarks',
@@ -1104,13 +1800,19 @@ export function PettyCashExpense() {
                         )
                       }
                       onFocus={() =>
-                        setFocusedField('remarks')
+                        setFocusedField(
+                          'remarks',
+                        )
                       }
                       onBlur={() =>
-                        setFocusedField(null)
+                        setFocusedField(
+                          null,
+                        )
                       }
                     />
                   </div>
+
+                  {/* Reference */}
 
                   <div className="space-y-1">
                     <label
@@ -1130,7 +1832,9 @@ export function PettyCashExpense() {
                         }`
                         }`}
                       placeholder="Cheque no., UPI ref."
-                      value={form.reference_number}
+                      value={
+                        form.reference_number
+                      }
                       onChange={e =>
                         setField(
                           'reference_number',
@@ -1143,7 +1847,9 @@ export function PettyCashExpense() {
                         )
                       }
                       onBlur={() =>
-                        setFocusedField(null)
+                        setFocusedField(
+                          null,
+                        )
                       }
                     />
 
@@ -1153,14 +1859,17 @@ export function PettyCashExpense() {
                         : 'text-slate-400'
                         }`}
                     >
-                      Optional for reconciliation
+                      Optional for
+                      reconciliation
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Employee Assignment */}
+            {/* ==================================================
+                EMPLOYEE ASSIGNMENT
+            ================================================== */}
 
             {needsEmployee && (
               <div
@@ -1190,93 +1899,90 @@ export function PettyCashExpense() {
                       </span>
                     </div>
 
-                    {amount > 0 &&
-                      form.employee_ids.length > 0 && (
-                        <span
-                          className={`text-xs font-semibold ${isDark
-                            ? 'text-indigo-400 bg-indigo-900/30'
-                            : 'text-indigo-600 bg-indigo-50'
-                            } px-2 py-0.5 rounded-full`}
-                        >
-                          {formatCurrency(
-                            amount /
-                            form.employee_ids.length,
-                          )}{' '}
-                          × {form.employee_ids.length}
-                        </span>
-                      )}
+                    {amount > 0 && (
+                      <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                        {formatCurrency(amount)} × {employeeCount} = {formatCurrency(totalAmount)}
+                      </span>
+                    )}
                   </div>
                 </div>
 
+                <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <input
+                    type="search"
+                    value={employeeSearch}
+                    onChange={e => setEmployeeSearch(e.target.value)}
+                    placeholder="Search employee..."
+                    className={`w-full rounded-lg border px-3 py-2 text-sm outline-none ${currentTheme.input.base
+                      }`}
+                  />
+
+                  <select
+                    value={employeePosition}
+                    onChange={e => setEmployeePosition(e.target.value)}
+                    className={`w-full rounded-lg border px-3 py-2 text-sm outline-none ${currentTheme.input.base
+                      }`}
+                  >
+                    <option value="">All positions</option>
+
+                    {employeePositions.map(position => (
+                      <option key={position} value={position}>
+                        {position}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="p-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-                    {employees.map(emp => {
-                      const selected =
-                        form.employee_ids.includes(
-                          emp.id,
-                        );
 
-                      return (
-                        <button
-                          key={emp.id}
-                          type="button"
-                          onClick={() =>
-                            toggleEmployee(emp.id)
-                          }
-                          className={`flex items-center gap-2 p-2 rounded-lg border text-left transition-all duration-200 ${selected
-                            ? isDark
-                              ? 'border-indigo-400 bg-indigo-900/30 text-indigo-300 shadow-sm ring-2 ring-indigo-900/30'
-                              : 'border-indigo-300 bg-indigo-50 text-indigo-700 shadow-sm ring-2 ring-indigo-100'
-                            : `${currentTheme.cardBorder} ${currentTheme.card} ${currentTheme.text.secondary} ${currentTheme.cardHover}`
-                            }`}
-                        >
+                  {/* Employee Loading */}
+
+                  {loadingEmployees ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+
+                        Loading employees...
+                      </div>
+                    </div>
+                  ) : filteredEmployees.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      No employees match your search or position filter.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {filteredEmployees.map(emp => {
+                        const selected = form.employee_ids.includes(emp.id);
+
+                        return (
                           <div
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${selected
-                              ? 'border-indigo-500 bg-indigo-500'
-                              : `${isDark
-                                ? 'border-slate-600'
-                                : 'border-slate-300'
-                              } ${currentTheme.card}`
-                              }`}
+                            key={emp.id}
+                            className="flex items-center justify-between rounded-lg border p-3"
                           >
-                            {selected && (
-                              <CheckCircle2
-                                size={10}
-                                className="text-white"
-                              />
-                            )}
-                          </div>
+                            <div>
+                              <p className="text-sm font-semibold">{emp.name}</p>
+                              <p className="text-xs text-slate-400">{emp.department || '—'}</p>
+                            </div>
 
-                          <div className="min-w-0">
-                            <p
-                              className={`text-xs font-semibold truncate ${isDark
-                                ? 'text-slate-200'
-                                : 'text-slate-700'
-                                }`}
+                            <button
+                              type="button"
+                              onClick={() => toggleEmployee(emp.id)}
+                              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white"
                             >
-                              {emp.name}
-                            </p>
-
-                            <p
-                              className={`text-[10px] ${isDark
-                                ? 'text-slate-500'
-                                : 'text-slate-400'
-                                } truncate`}
-                            >
-                              {(emp as {
-                                department?: string;
-                              }).department || '—'}
-                            </p>
+                              {selected ? 'Remove' : 'Add'}
+                            </button>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Driver & Vehicle */}
+            {/* ==================================================
+                DRIVER & VEHICLE
+            ================================================== */}
 
             {needsDriver && (
               <div
@@ -1327,7 +2033,9 @@ export function PettyCashExpense() {
                               : 'text-slate-700'
                             }`
                             }`}
-                          value={form.driver_id}
+                          value={
+                            form.driver_id
+                          }
                           onChange={e =>
                             setField(
                               'driver_id',
@@ -1340,21 +2048,25 @@ export function PettyCashExpense() {
                             )
                           }
                           onBlur={() =>
-                            setFocusedField(null)
+                            setFocusedField(
+                              null,
+                            )
                           }
                         >
                           <option value="">
                             Select driver
                           </option>
 
-                          {drivers.map(d => (
-                            <option
-                              key={d.id}
-                              value={d.id}
-                            >
-                              {d.name}
-                            </option>
-                          ))}
+                          {drivers.map(
+                            d => (
+                              <option
+                                key={d.id}
+                                value={d.id}
+                              >
+                                {d.name}
+                              </option>
+                            ),
+                          )}
                         </select>
 
                         <ChevronDown
@@ -1372,6 +2084,9 @@ export function PettyCashExpense() {
                           className={`flex items-center gap-1 text-xs font-medium ${currentTheme.text.muted} uppercase tracking-wider`}
                         >
                           Vehicle
+                          <span className="text-red-400">
+                            *
+                          </span>
                         </label>
 
                         <div className="relative">
@@ -1384,7 +2099,9 @@ export function PettyCashExpense() {
                                 : 'text-slate-700'
                               }`
                               }`}
-                            value={form.vehicle_id}
+                            value={
+                              form.vehicle_id
+                            }
                             onChange={e =>
                               setField(
                                 'vehicle_id',
@@ -1397,28 +2114,33 @@ export function PettyCashExpense() {
                               )
                             }
                             onBlur={() =>
-                              setFocusedField(null)
+                              setFocusedField(
+                                null,
+                              )
                             }
                           >
                             <option value="">
                               Select vehicle
                             </option>
 
-                            {vehicles.map(v => (
-                              <option
-                                key={v.id}
-                                value={v.id}
-                              >
-                                {
-                                  (
-                                    v as Vehicle & {
-                                      vehicle_no?: string;
-                                    }
-                                  ).vehicle_no ??
-                                  v.id
-                                }
-                              </option>
-                            ))}
+                            {vehicles.map(
+                              v => (
+                                <option
+                                  key={v.id}
+                                  value={v.id}
+                                >
+                                  {
+                                    (
+                                      v as Vehicle & {
+                                        vehicle_no?: string;
+                                      }
+                                    )
+                                      .vehicle_no ??
+                                    v.id
+                                  }
+                                </option>
+                              ),
+                            )}
                           </select>
 
                           <ChevronDown
@@ -1435,8 +2157,17 @@ export function PettyCashExpense() {
                       <label
                         className={`flex items-center gap-1 text-xs font-medium ${currentTheme.text.muted} uppercase tracking-wider`}
                       >
-                        <Route size={12} />
+                        <Route
+                          size={12}
+                        />
+
                         Route
+
+                        {needsRoute && (
+                          <span className="text-red-400">
+                            *
+                          </span>
+                        )}
                       </label>
 
                       <input
@@ -1449,7 +2180,9 @@ export function PettyCashExpense() {
                           }`
                           }`}
                         placeholder="Optional"
-                        value={form.route_id}
+                        value={
+                          form.route_id
+                        }
                         onChange={e =>
                           setField(
                             'route_id',
@@ -1462,7 +2195,9 @@ export function PettyCashExpense() {
                           )
                         }
                         onBlur={() =>
-                          setFocusedField(null)
+                          setFocusedField(
+                            null,
+                          )
                         }
                       />
                     </div>
@@ -1472,7 +2207,9 @@ export function PettyCashExpense() {
             )}
           </div>
 
-          {/* RIGHT — Summary Sidebar */}
+          {/* ==================================================
+              RIGHT SIDEBAR
+          ================================================== */}
 
           <div className="xl:col-span-4 space-y-4">
             <div className="sticky top-20 space-y-4">
@@ -1509,7 +2246,9 @@ export function PettyCashExpense() {
                           : 'bg-amber-100 text-amber-600'
                         }`}
                     >
-                      <Wallet size={16} />
+                      <Wallet
+                        size={16}
+                      />
                     </div>
 
                     <div>
@@ -1583,7 +2322,9 @@ export function PettyCashExpense() {
 
                   {hasInsufficientCash && (
                     <div className="flex items-center gap-1.5 mt-1 text-[10px] text-red-600 dark:text-red-400 font-medium">
-                      <AlertTriangle size={12} />
+                      <AlertTriangle
+                        size={12}
+                      />
                       Insufficient balance
                     </div>
                   )}
@@ -1610,7 +2351,7 @@ export function PettyCashExpense() {
 
                 <div className="p-4 space-y-3">
 
-                  {/* Location Summary */}
+                  {/* Location */}
 
                   <div className="flex justify-between items-center">
                     <span
@@ -1626,10 +2367,15 @@ export function PettyCashExpense() {
                       className={`text-xs font-semibold ${currentTheme.text.primary} truncate max-w-[140px]`}
                     >
                       {locations.find(
-                        l => l.locationId === form.location_id
-                      )?.branchName || '—'}
+                        l =>
+                          l.locationId ===
+                          form.location_id,
+                      )?.branchName ||
+                        '—'}
                     </span>
                   </div>
+
+                  {/* Category */}
 
                   <div className="flex justify-between items-center">
                     <span
@@ -1646,10 +2392,13 @@ export function PettyCashExpense() {
                     >
                       {categories.find(
                         c =>
-                          c.id === form.category_id,
+                          c.id ===
+                          form.category_id,
                       )?.name || '—'}
                     </span>
                   </div>
+
+                  {/* Expense */}
 
                   <div className="flex justify-between items-center">
                     <span
@@ -1672,6 +2421,8 @@ export function PettyCashExpense() {
                     </span>
                   </div>
 
+                  {/* Payment */}
+
                   <div className="flex justify-between items-center">
                     <span
                       className={`text-[10px] ${isDark
@@ -1692,6 +2443,8 @@ export function PettyCashExpense() {
                     </span>
                   </div>
 
+                  {/* Employees */}
+
                   {needsEmployee && (
                     <div className="flex justify-between items-center">
                       <span
@@ -1706,11 +2459,15 @@ export function PettyCashExpense() {
                       <span
                         className={`text-xs font-semibold ${currentTheme.text.primary}`}
                       >
-                        {form.employee_ids.length ||
+                        {form
+                          .employee_ids
+                          .length ||
                           '—'}
                       </span>
                     </div>
                   )}
+
+                  {/* Total */}
 
                   <div
                     className={`border-t ${isDark
@@ -1734,8 +2491,8 @@ export function PettyCashExpense() {
                           : currentTheme.text.primary
                           }`}
                       >
-                        {amount > 0
-                          ? formatCurrency(amount)
+                        {totalAmount > 0
+                          ? formatCurrency(totalAmount)
                           : '₹0'}
                       </span>
                     </div>
@@ -1780,25 +2537,33 @@ export function PettyCashExpense() {
                         : 'text-blue-600'
                         } mt-0.5 leading-relaxed`}
                     >
-                      Will be routed for approval
+                      Will be routed for
+                      approval
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Action Buttons */}
+              {/* ==================================================
+                  ACTION BUTTONS
+              ================================================== */}
 
               <div
                 className={`rounded-xl border ${currentTheme.cardBorder} ${currentTheme.card} ${currentTheme.cardShadow} p-4 space-y-2 transition-colors duration-300`}
               >
+
+                {/* Submit */}
+
                 <button
                   onClick={() =>
                     handleSubmit(false)
                   }
                   disabled={
-                    saving || !canSubmit
+                    saving ||
+                    !canSubmit
                   }
-                  className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-bold transition-all duration-200 ${canSubmit && !saving
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-bold transition-all duration-200 ${canSubmit &&
+                    !saving
                     ? currentTheme.button.primary +
                     ' active:scale-[0.98]'
                     : `${isDark
@@ -1807,21 +2572,30 @@ export function PettyCashExpense() {
                     } cursor-not-allowed`
                     }`}
                 >
-                  <Send size={14} />
+                  <Send
+                    size={14}
+                  />
 
                   {saving
                     ? 'Submitting...'
                     : 'Submit'}
                 </button>
 
+                {/* Submit & Add */}
+
                 <button
                   onClick={() =>
-                    handleSubmit(false, true)
+                    handleSubmit(
+                      false,
+                      true,
+                    )
                   }
                   disabled={
-                    saving || !canSubmit
+                    saving ||
+                    !canSubmit
                   }
-                  className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-bold transition-all duration-200 ${canSubmit && !saving
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-xs font-bold transition-all duration-200 ${canSubmit &&
+                    !saving
                     ? currentTheme.button.secondary +
                     ' active:scale-[0.98]'
                     : `${isDark
@@ -1833,10 +2607,14 @@ export function PettyCashExpense() {
                     } cursor-not-allowed`
                     }`}
                 >
-                  <Send size={14} />
+                  <Send
+                    size={14}
+                  />
 
                   Submit & Add
                 </button>
+
+                {/* Draft */}
 
                 <button
                   onClick={() =>
@@ -1850,7 +2628,9 @@ export function PettyCashExpense() {
                   }
                   className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-xs font-semibold transition-all duration-200 active:scale-[0.98] ${currentTheme.button.outline} disabled:opacity-40 disabled:cursor-not-allowed`}
                 >
-                  <Save size={13} />
+                  <Save
+                    size={13}
+                  />
 
                   Draft
                 </button>

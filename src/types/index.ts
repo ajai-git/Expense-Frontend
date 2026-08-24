@@ -54,26 +54,49 @@ export interface ExpenseName {
   category_color?: string;
 }
 
+export interface EmployeeAllocation {
+  employee_id: string;
+  amount: number;
+
+  // joined by backend
+  employee_name?: string;
+}
+
 export interface ExpenseTemplate {
   id: string;
   template_code: string;
   template_name: string;
-  cost_center_ids: string[];
+
+  location_id: string;
+
   active: boolean;
   is_deleted: boolean;
   created_at: string;
+
+  // joined
+  location_name?: string;
+
+  // TemplateRepository returns rows
   rows?: ExpenseTemplateRow[];
 }
 
 export interface ExpenseTemplateRow {
   id: string;
   template_id: string;
+
   expense_name_id: string;
   category_id: string;
+
   default_amount: number;
+
   employee_required: boolean;
+
   remarks?: string;
   sequence: number;
+
+  // Multiple employees can be allocated
+  employee_allocations: EmployeeAllocation[];
+
   // joined
   expense_name?: string;
   category_name?: string;
@@ -81,11 +104,9 @@ export interface ExpenseTemplateRow {
 
 export interface Employee {
   id: string;
-  employee_code: string;
   name: string;
   department?: string;
-  cost_center_id?: string;
-  active: boolean;
+  [key: string]: unknown;
 }
 
 export interface Driver {

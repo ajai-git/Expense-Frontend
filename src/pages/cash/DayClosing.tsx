@@ -106,15 +106,35 @@ export function DayClosing() {
 
       const data = await getLocations();
 
-      const activeLocations = Array.isArray(data)
-        ? data.filter(
+      const normalizedLocations: Location[] = data
+        .map((location: any) => ({
+          locationId:
+            location.locationId ??
+            location.location_id ??
+            location.id ??
+            '',
+          branchName:
+            location.branchName ??
+            location.branch_name ??
+            location.name ??
+            '',
+          aliasName:
+            location.aliasName ??
+            location.alias_name ??
+            '',
+          status: location.status,
+          type: location.type,
+        }))
+        .filter(
           location =>
-            !location.status ||
-            location.status.toLowerCase() === 'active'
-        )
-        : [];
+            location.locationId &&
+            (
+              !location.status ||
+              location.status.toLowerCase() === 'active'
+            )
+        );
 
-      setLocations(activeLocations);
+      setLocations(normalizedLocations);
     } catch (error) {
       notify(
         error instanceof Error
@@ -550,35 +570,41 @@ export function DayClosing() {
 
         ) : (
 
-          <table className="w-full">
+          <table className="w-full table-fixed">
+            <colgroup>
+              <col className="w-[20%]" />
+              <col className="w-[15%]" />
+              <col className="w-[15%]" />
+              <col className="w-[20%]" />
+              <col className="w-[12%]" />
+              <col className="w-[14%]" />
+            </colgroup>
 
             <thead>
               <tr className="border-b border-slate-100">
-
-                <th className="table-header">
+                <th className="table-header text-left">
                   Location
                 </th>
 
-                <th className="table-header">
+                <th className="table-header text-right">
                   Opening
                 </th>
 
-                <th className="table-header">
+                <th className="table-header text-right">
                   Expenses
                 </th>
 
-                <th className="table-header">
+                <th className="table-header text-right">
                   Expected Closing
                 </th>
 
-                <th className="table-header">
+                <th className="table-header text-center">
                   Status
                 </th>
 
                 <th className="table-header text-right">
                   Action
                 </th>
-
               </tr>
             </thead>
 
@@ -642,35 +668,31 @@ export function DayClosing() {
                     </td>
 
                     {/* Opening */}
-                    <td className="table-cell font-semibold text-slate-800">
-                      {formatCurrency(
-                        session.opening_balance || 0
-                      )}
+                    <td className="table-cell text-right font-semibold text-slate-800">
+                      {formatCurrency(session.opening_balance || 0)}
                     </td>
 
                     {/* Expenses */}
-                    <td className="table-cell font-medium text-red-600">
-                      {formatCurrency(
-                        session.total_expenses || 0
-                      )}
+                    <td className="table-cell text-right font-medium text-red-600">
+                      {formatCurrency(session.total_expenses || 0)}
                     </td>
 
                     {/* Expected */}
-                    <td className="table-cell font-bold text-slate-800">
+                    <td className="table-cell text-right font-bold text-slate-800">
                       {formatCurrency(expected)}
                     </td>
 
                     {/* Status */}
-                    <td className="table-cell">
-
+                    <td className="table-cell text-center">
                       <StatusBadge
                         status={session.status}
                       />
-
                     </td>
 
+
+
                     {/* Action */}
-                    <td className="table-cell text-right">
+                    <td className="table-cell text-center">
 
                       {isOpen ? (
 
@@ -794,7 +816,7 @@ export function DayClosing() {
 
             </div>
 
-           {/* Date */}
+            {/* Date */}
             <div>
               <label className="label">
                 Date
@@ -977,6 +999,6 @@ export function DayClosing() {
 
       </Modal>
 
-    </div>
+    </div >
   );
 }

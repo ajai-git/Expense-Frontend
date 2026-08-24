@@ -123,10 +123,8 @@ export function OpeningCash() {
 
       const data = await getLocations();
 
-      console.log('OPENING CASH LOCATIONS:', data);
-
-      const normalizedLocations: Location[] = Array.isArray(data)
-        ? data.map((location: any) => ({
+      const normalizedLocations: Location[] = data
+        .map((location: any) => ({
           locationId:
             location.locationId ??
             location.location_id ??
@@ -144,18 +142,17 @@ export function OpeningCash() {
           status: location.status,
           type: location.type,
         }))
-        : [];
+        .filter(
+          location =>
+            location.locationId &&
+            (
+              !location.status ||
+              location.status.toLowerCase() === 'active'
+            )
+        );
 
-      const activeLocations = normalizedLocations.filter(
-        location =>
-          location.locationId &&
-          (
-            !location.status ||
-            location.status.toLowerCase() === 'active'
-          )
-      );
+      setLocations(normalizedLocations);
 
-      setLocations(activeLocations);
     } catch (error) {
       console.error('OPENING CASH LOCATION ERROR:', error);
 

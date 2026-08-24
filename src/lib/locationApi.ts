@@ -1,14 +1,50 @@
 import { getAuthToken } from './api';
 
 const LOCATION_API_URL =
-  import.meta.env.VITE_LOCATION_API_URL ||
-  'https://yenerp.com/demoapi1';
+  'https://yenerp.com/masteradminapi';
 
-export async function getLocations() {
+export interface LocationApiItem {
+  locationId?: string;
+  location_id?: string;
+  branchName?: string;
+  branch_name?: string;
+  aliasName?: string;
+  alias_name?: string;
+  name?: string;
+  status?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+let locationsCache: LocationApiItem[] | null = null;
+let locationsPromise: Promise<LocationApiItem[]> | null = null;
+
+const CACHE_TIME = 10 * 60 * 1000; // 10 minutes
+
+let locationsCacheTime = 0;
+
+export async function getLocations(
+  forceRefresh = false
+): Promise<LocationApiItem[]> {
+
+  // Return cached locations if still valid
+  if (
+    !forceRefresh &&
+    locationsCache &&
+    Date.now() - locationsCacheTime < CACHE_TIME
+  ) {
+    return locationsCache;
+  }
+
+  // If a request is already running, reuse it
+  if (!forceRefresh && locationsPromise) {
+    return locationsPromise;
+  }
+
   const token = getAuthToken();
 
-  const res = await fetch(
-    `${LOCATION_API_URL}/locations/overall`,
+  locationsPromise = fetch(
+    `${LOCATION_API_URL}/locations/`,
     {
       method: 'GET',
       headers: {
@@ -18,37 +54,43 @@ export async function getLocations() {
           : {}),
       },
     }
-  );
+  )
+    .then(async res => {
+      const json = await res.json();
 
-  const json = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          json?.detail ||
+          json?.message ||
+          `Failed to load locations: ${res.status}`
+        );
+      }
 
-  console.log('LOCATION API STATUS:', res.status);
-  console.log('LOCATION API RESPONSE:', json);
+      let locations: LocationApiItem[] = [];
 
-  if (!res.ok) {
-    throw new Error(
-      json?.detail ||
-      json?.message ||
-      `Failed to load locations: ${res.status}`
-    );
-  }
+      if (Array.isArray(json)) {
+        locations = json;
+      } else if (Array.isArray(json?.data)) {
+        locations = json.data;
+      } else if (Array.isArray(json?.locations)) {
+        locations = json.locations;
+      } else if (Array.isArray(json?.data?.locations)) {
+        locations = json.data.locations;
+      }
 
-  // Handle different response structures
-  if (Array.isArray(json)) {
-    return json;
-  }
+      locationsCache = locations;
+      locationsCacheTime = Date.now();
 
-  if (Array.isArray(json?.data)) {
-    return json.data;
-  }
+      return locations;
+    })
+    .finally(() => {
+      locationsPromise = null;
+    });
 
-  if (Array.isArray(json?.locations)) {
-    return json.locations;
-  }
+  return locationsPromise;
+}
 
-  if (Array.isArray(json?.data?.locations)) {
-    return json.data.locations;
-  }
-
-  return [];
+export function clearLocationsCache() {
+  locationsCache = null;
+  locationsCacheTime = 0;
 }
